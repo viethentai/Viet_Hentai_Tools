@@ -8,8 +8,13 @@
       G              - Bật/tắt ESP
       RightShift     - Ẩn/hiện cửa sổ
       WASD           - Di chuyển
-      Q / E          - Lên / xuống (hoặc phím mũi tên Up / Down)
+      E / Up arrow   - Bay lên (khi đứng gần vật tương tác, E ưu tiên tương tác)
+      Q / Down arrow - Bay xuống
       + / -          - Đổi mốc tốc độ (giữ để lặp lại)
+
+    Icon nút thu gọn:
+      Đặt BUBBLE_IMAGE_ID = "rbxassetid://<ID>" để dùng ảnh.
+      Để trống "" thì nút hiển thị chữ "VH".
 ]]
 
 local Players = game:GetService("Players")
@@ -23,6 +28,9 @@ local MarketplaceService = game:GetService("MarketplaceService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+
+-- Icon cho nút thu gọn (rbxassetid://ID). Để "" nếu không dùng ảnh.
+local BUBBLE_IMAGE_ID = ""
 
 -- HTTP request function của executor (nếu có)
 local requestFunc = (syn and syn.request)
@@ -56,11 +64,16 @@ end
 local CHANGE_INTERVAL = 0.12
 local MAX_SERVER_PAGES = 20
 local PAGE_DELAY = 0.25
+local MIN_DISPLAY = 1
+local MAX_DISPLAY = 100
+local DEFAULT_DISPLAY = 20
+local PROMPT_SEARCH_RADIUS = 32
 
 local WINDOW_SIZE = UDim2.fromOffset(520, 400)
-local BUBBLE_SIZE = UDim2.fromOffset(56, 36)
-local TWEEN_OPEN = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-local TWEEN_CLOSE = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+local BUBBLE_SIZE = UDim2.fromOffset(52, 52)
+local TWEEN_MINIMIZE = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+local TWEEN_RESTORE = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local TWEEN_CLOSE = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 local COLOR_BG = Color3.fromRGB(28, 32, 42)
 local COLOR_STROKE = Color3.fromRGB(80, 190, 170)
@@ -94,10 +107,13 @@ local renderConnection
 local noclipConnection
 local noclipChanged = {} -- [BasePart] = true, parts whose CanCollide we turned off
 
-local currentTab = "FLY"
 local serverLoaded = false
 local serverLoading = false
 local gameName = "Unknown"
+
+local maxDisplay = DEFAULT_DISPLAY
+local sortAscending = true -- true: ít -> nhiều, false: nhiều -> ít
+local cachedServers = {}   -- danh sách server còn chỗ, lấy từ lần tải gần nhất
 
 ---------------------------------------------------------------------
 -- Cleanup old copies & notify
@@ -138,7 +154,7 @@ end)
 ---------------------------------------------------------------------
 local function makeCorner(parent, radius)
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, radius)
+    corner.CornerRadius = radius
     corner.Parent = parent
     return corner
 end
@@ -156,7 +172,7 @@ local function makeButton(parent, name, text, position, size, color, textSize)
     button.TextSize = textSize or 13
     button.AutoButtonColor = true
     button.Parent = parent
-    makeCorner(button, 7)
+    makeCorner(button, UDim.new(0, 7))
     return button
 end
 
@@ -248,7 +264,7 @@ main.Active = true
 main.Draggable = true
 main.ClipsDescendants = true
 main.Parent = gui
-makeCorner(main, 10)
+makeCorner(main, UDim.new(0, 10))
 
 local mainStroke = Instance.new("UIStroke")
 mainStroke.Color = COLOR_STROKE
@@ -301,12 +317,12 @@ countBox.TextSize = 16
 countBox.ClearTextOnFocus = false
 countBox.PlaceholderText = "Mốc (1-30)"
 countBox.Parent = flyPage
-makeCorner(countBox, 7)
+makeCorner(countBox, UDim.new(0, 7))
 
 local plus = makeButton(flyPage, "Plus", "+",
     UDim2.fromOffset(464, 62), UDim2.fromOffset(44, 38), COLOR_PLUS, 18)
 
-local hint = makeLabel(flyPage, "Hint", "F: Bay   N: NoClip   WASD/Q/E: di chuyển   RightShift: ẩn/hiện",
+local hint = makeLabel(flyPage, "Hint", "E: lên   Q: xuống   E gần vật: tương tác   RightShift: ẩn/hiện",
     UDim2.fromOffset(12, 116), UDim2.fromOffset(496, 22), 11)
 hint.Font = Enum.Font.Gotham
 hint.TextColor3 = COLOR_HINT
@@ -330,17 +346,36 @@ serverStatus.Font = Enum.Font.Gotham
 local refreshBtn = makeButton(serverPage, "Refresh", "LÀM MỚI",
     UDim2.fromOffset(380, 6), UDim2.fromOffset(128, 26), COLOR_PLUS, 12)
 
+-- Hàng điều khiển: số server hiển thị + kiểu sắp xếp
+local maxBox = Instance.new("TextBox")
+maxBox.Name = "MaxBox"
+maxBox.Position = UDim2.fromOffset(12, 40)
+maxBox.Size = UDim2.fromOffset(170, 28)
+maxBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+maxBox.BorderSizePixel = 0
+maxBox.Font = Enum.Font.GothamBold
+maxBox.Text = tostring(maxDisplay)
+maxBox.TextColor3 = Color3.fromRGB(25, 30, 35)
+maxBox.TextSize = 13
+maxBox.ClearTextOnFocus = false
+maxBox.PlaceholderText = "Số server hiển thị (1-100)"
+maxBox.Parent = serverPage
+makeCorner(maxBox, UDim.new(0, 7))
+
+local sortBtn = makeButton(serverPage, "Sort", "SẮP XẾP: ÍT → NHIỀU",
+    UDim2.fromOffset(192, 40), UDim2.fromOffset(316, 28), COLOR_MINUS, 12)
+
 local serverList = Instance.new("ScrollingFrame")
 serverList.Name = "ServerList"
-serverList.Position = UDim2.fromOffset(12, 40)
-serverList.Size = UDim2.fromOffset(496, 260)
+serverList.Position = UDim2.fromOffset(12, 76)
+serverList.Size = UDim2.fromOffset(496, 224)
 serverList.BackgroundColor3 = COLOR_LIST
 serverList.BorderSizePixel = 0
 serverList.CanvasSize = UDim2.new(0, 0, 0, 0)
 serverList.AutomaticCanvasSize = Enum.AutomaticSize.Y
 serverList.ScrollBarThickness = 5
 serverList.Parent = serverPage
-makeCorner(serverList, 8)
+makeCorner(serverList, UDim.new(0, 8))
 
 local listLayout = Instance.new("UIListLayout")
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -355,45 +390,54 @@ listPadding.PaddingBottom = UDim.new(0, 6)
 listPadding.Parent = serverList
 
 ---------------------------------------------------------------------
--- Bubble (hiện khi thu gọn)
+-- Bubble (nút tròn, hiện khi thu gọn)
 ---------------------------------------------------------------------
-local bubble = makeButton(gui, "Bubble", "VH",
-    UDim2.fromOffset(10, 200), BUBBLE_SIZE, COLOR_STROKE, 13)
+local bubble = Instance.new("TextButton")
+bubble.Name = "Bubble"
+bubble.Position = UDim2.fromOffset(10, 200)
+bubble.Size = BUBBLE_SIZE
+bubble.BackgroundColor3 = COLOR_STROKE
+bubble.BorderSizePixel = 0
+bubble.AutoButtonColor = false
+bubble.Font = Enum.Font.GothamBold
+bubble.Text = "VH"
+bubble.TextColor3 = COLOR_DARK_TEXT
+bubble.TextSize = 16
+bubble.ClipsDescendants = true
 bubble.Visible = false
+bubble.Parent = gui
+makeCorner(bubble, UDim.new(0.5, 0)) -- bo tròn thành hình tròn
+
+if BUBBLE_IMAGE_ID ~= "" then
+    bubble.Text = ""
+    local icon = Instance.new("ImageLabel")
+    icon.Name = "Icon"
+    icon.Size = UDim2.fromScale(1, 1)
+    icon.BackgroundTransparency = 1
+    icon.Image = BUBBLE_IMAGE_ID
+    icon.ScaleType = Enum.ScaleType.Crop
+    icon.Parent = bubble
+    makeCorner(icon, UDim.new(0.5, 0))
+end
 
 ---------------------------------------------------------------------
--- Window open / close animation
+-- Window minimize / restore animation
+-- Thu nhỏ từ từ vào đúng vị trí nút tròn, và phóng ra từ nút tròn.
 ---------------------------------------------------------------------
 local windowOpen = true
 local windowBusy = false
 local openPosition = main.Position
 
--- Vị trí thu nhỏ về đúng tâm của cửa sổ
-local function closedPositionFor(pos)
-    return UDim2.new(
-        pos.X.Scale, pos.X.Offset + WINDOW_SIZE.X.Offset / 2,
-        pos.Y.Scale, pos.Y.Offset + WINDOW_SIZE.Y.Offset / 2
-    )
-end
-
-local function showBubble()
-    bubble.Visible = true
-    bubble.Size = UDim2.fromOffset(0, 0)
-    TweenService:Create(bubble, TWEEN_OPEN, { Size = BUBBLE_SIZE }):Play()
-end
-
-local function hideBubble(onDone)
-    local tween = TweenService:Create(bubble, TWEEN_CLOSE, { Size = UDim2.fromOffset(0, 0) })
-    tween.Completed:Once(function()
-        bubble.Visible = false
-        if onDone then
-            onDone()
-        end
-    end)
+local function tweenWindow(info, goal, onDone)
+    local tween = TweenService:Create(main, info, goal)
+    if onDone then
+        tween.Completed:Once(onDone)
+    end
     tween:Play()
+    return tween
 end
 
-local function closeWindow(onDone)
+local function minimizeWindow()
     if not windowOpen or windowBusy then
         return
     end
@@ -401,20 +445,16 @@ local function closeWindow(onDone)
     windowOpen = false
     openPosition = main.Position
 
-    local tween = TweenService:Create(main, TWEEN_CLOSE, {
-        Size = UDim2.fromOffset(0, 0),
-        Position = closedPositionFor(openPosition),
-    })
-    tween.Completed:Once(function()
+    tweenWindow(TWEEN_MINIMIZE, {
+        Size = BUBBLE_SIZE,
+        Position = bubble.Position,
+    }, function()
         main.Visible = false
         main.Size = WINDOW_SIZE
         main.Position = openPosition
+        bubble.Visible = true
         windowBusy = false
-        if onDone then
-            onDone()
-        end
     end)
-    tween:Play()
 end
 
 local function openWindow()
@@ -424,25 +464,16 @@ local function openWindow()
     windowBusy = true
     windowOpen = true
 
-    hideBubble(function()
-        main.Visible = true
-        main.Size = UDim2.fromOffset(0, 0)
-        main.Position = closedPositionFor(openPosition)
+    bubble.Visible = false
+    main.Visible = true
+    main.Size = BUBBLE_SIZE
+    main.Position = bubble.Position
 
-        local tween = TweenService:Create(main, TWEEN_OPEN, {
-            Size = WINDOW_SIZE,
-            Position = openPosition,
-        })
-        tween.Completed:Once(function()
-            windowBusy = false
-        end)
-        tween:Play()
-    end)
-end
-
-local function minimizeWindow()
-    closeWindow(function()
-        showBubble()
+    tweenWindow(TWEEN_RESTORE, {
+        Size = WINDOW_SIZE,
+        Position = openPosition,
+    }, function()
+        windowBusy = false
     end)
 end
 
@@ -866,24 +897,28 @@ end
 ---------------------------------------------------------------------
 -- Flight
 ---------------------------------------------------------------------
-local function stopFlight()
-    flying = false
-    refreshToggles()
+local stopFlight
 
-    if renderConnection then
-        renderConnection:Disconnect()
-        renderConnection = nil
+local promptParams = OverlapParams.new()
+promptParams.FilterType = Enum.RaycastFilterType.Exclude
+
+-- Kiểm tra có ProximityPrompt (vật cần tương tác bằng E) gần nhân vật không.
+local function hasInteractableNearby(rootPart)
+    promptParams.FilterDescendantsInstances = character and { character } or {}
+
+    local parts = workspace:GetPartBoundsInRadius(rootPart.Position, PROMPT_SEARCH_RADIUS, promptParams)
+    for _, part in ipairs(parts) do
+        for _, inst in ipairs(part:GetDescendants()) do
+            if inst:IsA("ProximityPrompt") and inst.Enabled then
+                local distance = (part.Position - rootPart.Position).Magnitude
+                if distance <= inst.MaxActivationDistance then
+                    return true
+                end
+            end
+        end
     end
 
-    if velocity then velocity:Destroy(); velocity = nil end
-    if orientation then orientation:Destroy(); orientation = nil end
-    if attachment then attachment:Destroy(); attachment = nil end
-
-    if humanoid and humanoid.Parent then
-        humanoid.AutoRotate = oldAutoRotate == nil and true or oldAutoRotate
-        humanoid.PlatformStand = oldPlatformStand == nil and false or oldPlatformStand
-        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-    end
+    return false
 end
 
 local function getKeyboardMove(camera)
@@ -908,6 +943,26 @@ local function getKeyboardMove(camera)
     end
 
     return direction
+end
+
+stopFlight = function()
+    flying = false
+    refreshToggles()
+
+    if renderConnection then
+        renderConnection:Disconnect()
+        renderConnection = nil
+    end
+
+    if velocity then velocity:Destroy(); velocity = nil end
+    if orientation then orientation:Destroy(); orientation = nil end
+    if attachment then attachment:Destroy(); attachment = nil end
+
+    if humanoid and humanoid.Parent then
+        humanoid.AutoRotate = oldAutoRotate == nil and true or oldAutoRotate
+        humanoid.PlatformStand = oldPlatformStand == nil and false or oldPlatformStand
+        humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end
 end
 
 local function startFlight()
@@ -960,14 +1015,19 @@ local function startFlight()
         if not camera then return end
 
         local moveDirection = getKeyboardMove(camera)
-        local vertical = 0
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.Q)
-            or UserInputService:IsKeyDown(Enum.KeyCode.Up) then
+        -- E / Up: bay lên. Nếu đang đứng gần vật tương tác thì E dành cho tương tác.
+        -- Q / Down: bay xuống.
+        local upHeld = UserInputService:IsKeyDown(Enum.KeyCode.E)
+            or UserInputService:IsKeyDown(Enum.KeyCode.Up)
+        local downHeld = UserInputService:IsKeyDown(Enum.KeyCode.Q)
+            or UserInputService:IsKeyDown(Enum.KeyCode.Down)
+
+        local vertical = 0
+        if upHeld and not hasInteractableNearby(root) then
             vertical += 1
         end
-        if UserInputService:IsKeyDown(Enum.KeyCode.E)
-            or UserInputService:IsKeyDown(Enum.KeyCode.Down) then
+        if downHeld then
             vertical -= 1
         end
 
@@ -1016,7 +1076,7 @@ local function createServerEntry(server, order)
     row.BorderSizePixel = 0
     row.LayoutOrder = order
     row.Parent = serverList
-    makeCorner(row, 8)
+    makeCorner(row, UDim.new(0, 8))
 
     local info = Instance.new("TextLabel")
     info.Name = "ServerInfo"
@@ -1046,7 +1106,7 @@ local function createServerEntry(server, order)
     joinBtn.Text = isCurrent and "HIỆN TẠI" or "JOIN 🚀"
     joinBtn.AutoButtonColor = not isCurrent
     joinBtn.Parent = row
-    makeCorner(joinBtn, 7)
+    makeCorner(joinBtn, UDim.new(0, 7))
 
     if not isCurrent then
         joinBtn.Activated:Connect(function()
@@ -1058,6 +1118,63 @@ local function createServerEntry(server, order)
                 setStatus("Teleport lỗi: " .. tostring(err))
             end
         end)
+    end
+end
+
+-- Vẽ lại danh sách từ cache theo số lượng và kiểu sắp xếp hiện tại.
+-- Không gọi lại API nên đổi số lượng/sắp xếp thì tức thì.
+local function renderServers()
+    local sorted = {}
+    for _, server in ipairs(cachedServers) do
+        table.insert(sorted, server)
+    end
+
+    table.sort(sorted, function(a, b)
+        if sortAscending then
+            return a.playing < b.playing
+        end
+        return a.playing > b.playing
+    end)
+
+    clearServerList()
+
+    local shown = 0
+    for _, server in ipairs(sorted) do
+        if shown >= maxDisplay then
+            break
+        end
+        shown += 1
+        createServerEntry(server, shown)
+    end
+
+    return shown, #sorted
+end
+
+local function refreshServerView(note)
+    local shown, total = renderServers()
+
+    if total == 0 then
+        setStatus("Không có server nào còn chỗ." .. (note and (" | " .. note) or ""))
+    else
+        local text = string.format("Hiển thị %d / %d server còn chỗ", shown, total)
+        if note then
+            text = text .. " | " .. note
+        end
+        setStatus(text)
+    end
+end
+
+local function updateSortButton()
+    sortBtn.Text = sortAscending and "SẮP XẾP: ÍT → NHIỀU" or "SẮP XẾP: NHIỀU → ÍT"
+end
+
+local function setMaxDisplay(value)
+    value = math.floor(tonumber(value) or maxDisplay)
+    maxDisplay = math.clamp(value, MIN_DISPLAY, MAX_DISPLAY)
+    maxBox.Text = tostring(maxDisplay)
+
+    if serverLoaded and not serverLoading then
+        refreshServerView()
     end
 end
 
@@ -1143,28 +1260,15 @@ local function loadServers()
             -- Lỗi và không lấy được gì: giữ nguyên danh sách cũ
             setStatus("Lỗi: " .. errorMsg .. " (giữ danh sách cũ)")
         else
-            table.sort(servers, function(a, b)
-                return a.playing < b.playing
-            end)
-
-            -- Chỉ xóa danh sách cũ khi đã có dữ liệu mới
-            clearServerList()
-
-            local count = 0
+            -- Chỉ giữ server còn chỗ, rồi cập nhật cache và vẽ lại
+            cachedServers = {}
             for _, server in ipairs(servers) do
                 if server.playing < server.maxPlayers then
-                    count += 1
-                    createServerEntry(server, count)
+                    table.insert(cachedServers, server)
                 end
             end
 
-            if count == 0 then
-                setStatus("Không có server nào còn chỗ.")
-            elseif errorMsg then
-                setStatus(string.format("%d server (tải chưa đủ: %s)", count, errorMsg))
-            else
-                setStatus(string.format("Tìm thấy %d server còn chỗ, ít người trước", count))
-            end
+            refreshServerView(errorMsg and ("tải chưa đủ: " .. errorMsg) or nil)
         end
 
         refreshBtn.Text = "LÀM MỚI"
@@ -1176,7 +1280,6 @@ end
 -- Tabs
 ---------------------------------------------------------------------
 local function showTab(tabName)
-    currentTab = tabName
     flyPage.Visible = tabName == "FLY"
     serverPage.Visible = tabName == "SERVER"
     espPage.Visible = tabName == "ESP"
@@ -1190,6 +1293,7 @@ local function showTab(tabName)
     end
 end
 
+updateSortButton()
 showTab("FLY")
 
 ---------------------------------------------------------------------
@@ -1202,6 +1306,18 @@ serverTab.Activated:Connect(function() showTab("SERVER") end)
 espTab.Activated:Connect(function() showTab("ESP") end)
 refreshBtn.Activated:Connect(loadServers)
 minimizeBtn.Activated:Connect(minimizeWindow)
+
+maxBox.FocusLost:Connect(function()
+    setMaxDisplay(maxBox.Text)
+end)
+
+sortBtn.Activated:Connect(function()
+    sortAscending = not sortAscending
+    updateSortButton()
+    if serverLoaded and not serverLoading then
+        refreshServerView()
+    end
+end)
 
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed or UserInputService:GetFocusedTextBox() then
@@ -1231,8 +1347,8 @@ closeBtn.Activated:Connect(function()
     if windowOpen then
         windowOpen = false
         local tween = TweenService:Create(main, TWEEN_CLOSE, {
-            Size = UDim2.fromOffset(0, 0),
-            Position = closedPositionFor(main.Position),
+            Size = BUBBLE_SIZE,
+            Position = bubble.Position,
         })
         tween.Completed:Once(function()
             gui:Destroy()
