@@ -30,7 +30,7 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- Icon cho nút thu gọn (rbxassetid://ID). Để "" nếu không dùng ảnh.
-local BUBBLE_IMAGE_ID = ""
+local BUBBLE_IMAGE_ID = "92317774321131"
 
 -- HTTP request function của executor (nếu có)
 local requestFunc = (syn and syn.request)
@@ -410,14 +410,21 @@ makeCorner(bubble, UDim.new(0.5, 0)) -- bo tròn thành hình tròn
 
 if BUBBLE_IMAGE_ID ~= "" then
     bubble.Text = ""
+    bubble.BackgroundTransparency = 1
+
     local icon = Instance.new("ImageLabel")
     icon.Name = "Icon"
     icon.Size = UDim2.fromScale(1, 1)
     icon.BackgroundTransparency = 1
     icon.Image = BUBBLE_IMAGE_ID
-    icon.ScaleType = Enum.ScaleType.Crop
+    icon.ScaleType = Enum.ScaleType.Fit
     icon.Parent = bubble
     makeCorner(icon, UDim.new(0.5, 0))
+
+    local ring = Instance.new("UIStroke")
+    ring.Color = COLOR_STROKE
+    ring.Thickness = 2
+    ring.Parent = bubble
 end
 
 ---------------------------------------------------------------------
