@@ -30,7 +30,7 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 -- Icon cho nút thu gọn (rbxassetid://ID). Để "" nếu không dùng ảnh.
-local BUBBLE_IMAGE_ID = "rbxassetid://92317774321131"
+local BUBBLE_IMAGE_ID = "97762580444093"
 
 -- HTTP request function của executor (nếu có)
 local requestFunc = (syn and syn.request)
