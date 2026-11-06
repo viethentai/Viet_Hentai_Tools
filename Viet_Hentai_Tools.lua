@@ -1123,9 +1123,11 @@ end
 
 -- Vẽ lại danh sách từ cache theo số lượng và kiểu sắp xếp hiện tại.
 -- Không gọi lại API nên đổi số lượng/sắp xếp thì tức thì.
-local function renderServers()
+local loadServers -- khai báo trước, định nghĩa ở phần dưới
+
+local function renderServers(list)
     local sorted = {}
-    for _, server in ipairs(cachedServers) do
+    for _, server in ipairs(list) do
         table.insert(sorted, server)
     end
 
@@ -1151,7 +1153,7 @@ local function renderServers()
 end
 
 local function refreshServerView(note)
-    local shown, total = renderServers()
+    local shown, total = renderServers(cachedServers)
 
     if total == 0 then
         setStatus("Không có server nào còn chỗ." .. (note and (" | " .. note) or ""))
@@ -1170,23 +1172,34 @@ end
 
 local function setMaxDisplay(value)
     value = math.floor(tonumber(value) or maxDisplay)
-    maxDisplay = math.clamp(value, MIN_DISPLAY, MAX_DISPLAY)
+    value = math.clamp(value, MIN_DISPLAY, MAX_DISPLAY)
+    local changed = value ~= maxDisplay
+    maxDisplay = value
     maxBox.Text = tostring(maxDisplay)
 
-    if serverLoaded and not serverLoading then
-        refreshServerView()
+    -- Đổi số lượng thì quét lại đúng bằng số đó
+    if changed and serverLoaded and not serverLoading then
+        loadServers()
     end
 end
 
+-- Chọn kích thước trang nhỏ nhất đủ dùng, để mỗi lần gọi API tải ít dữ liệu hơn.
+local function getPageLimit(needed)
+    if needed <= 10 then return 10 end
+    if needed <= 25 then return 25 end
+    if needed <= 50 then return 50 end
+    return 100
+end
+
 -- Lấy một trang server. Tự thử lại khi bị giới hạn tốc độ (HTTP 429).
-local function fetchPage(cursor)
+local function fetchPage(cursor, limit)
     if not requestFunc then
         return nil, "Executor không hỗ trợ HTTP request"
     end
 
     local url = string.format(
-        "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
-        game.PlaceId
+        "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=%d",
+        game.PlaceId, limit
     )
     if cursor then
         url = url .. "&cursor=" .. cursor
@@ -1222,53 +1235,62 @@ local function fetchPage(cursor)
     return nil, lastError
 end
 
-local function loadServers()
+loadServers = function()
     if serverLoading then
         return
     end
     serverLoading = true
     serverLoaded = true
 
-    setStatus("Đang tải danh sách server...")
-    refreshBtn.Text = "ĐANG TẢI"
+    -- Quét đúng bằng số server người dùng muốn hiển thị
+    local target = maxDisplay
+    local limit = getPageLimit(target)
+
+    setStatus(string.format("Đang quét... 0 / %d server", target))
+    refreshBtn.Text = "ĐANG QUÉT"
 
     task.spawn(function()
-        local servers = {}
+        local found = {}
+        local seen = {}
         local cursor = nil
         local pages = 0
         local errorMsg = nil
 
         repeat
-            local data, err = fetchPage(cursor)
+            local data, err = fetchPage(cursor, limit)
             if not data then
                 errorMsg = err
                 break
             end
 
             for _, server in ipairs(data.data or {}) do
-                table.insert(servers, server)
-            end
-
-            cursor = data.nextPageCursor
-            pages += 1
-            if cursor and pages < MAX_SERVER_PAGES then
-                task.wait(PAGE_DELAY)
-            end
-        until not cursor or pages >= MAX_SERVER_PAGES
-
-        if errorMsg and #servers == 0 then
-            -- Lỗi và không lấy được gì: giữ nguyên danh sách cũ
-            setStatus("Lỗi: " .. errorMsg .. " (giữ danh sách cũ)")
-        else
-            -- Chỉ giữ server còn chỗ, rồi cập nhật cache và vẽ lại
-            cachedServers = {}
-            for _, server in ipairs(servers) do
-                if server.playing < server.maxPlayers then
-                    table.insert(cachedServers, server)
+                if #found >= target then
+                    break
+                end
+                if server.playing < server.maxPlayers and not seen[server.id] then
+                    seen[server.id] = true
+                    table.insert(found, server)
                 end
             end
 
-            refreshServerView(errorMsg and ("tải chưa đủ: " .. errorMsg) or nil)
+            pages += 1
+            cursor = data.nextPageCursor
+
+            -- Hiển thị ngay khi có kết quả, không đợi quét xong
+            renderServers(found)
+            setStatus(string.format("Đang quét... %d / %d server", #found, target))
+
+            if #found < target and cursor and pages < MAX_SERVER_PAGES then
+                task.wait(PAGE_DELAY)
+            end
+        until #found >= target or not cursor or pages >= MAX_SERVER_PAGES
+
+        if errorMsg and #found == 0 then
+            -- Lỗi và chưa có kết quả nào: giữ nguyên danh sách cũ
+            setStatus("Lỗi: " .. errorMsg .. " (giữ danh sách cũ)")
+        else
+            cachedServers = found
+            refreshServerView(errorMsg and ("quét chưa đủ: " .. errorMsg) or nil)
         end
 
         refreshBtn.Text = "LÀM MỚI"
