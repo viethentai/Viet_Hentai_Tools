@@ -407,7 +407,8 @@ makeCorner(bubble, UDim.new(0.5, 0)) -- bo tròn thành hình tròn
 
 bubble.Text = "🐱"
 bubble.TextSize = 24
-bubble.BackgroundTransparency = 1
+bubble.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+bubble.BackgroundTransparency = 0
 
 ---------------------------------------------------------------------
 -- Window minimize / restore animation
