@@ -278,9 +278,10 @@ local closeBtn = makeButton(main, "Close", "X", UDim2.fromOffset(482, 8), UDim2.
 local flyTab = makeButton(main, "TabFly", "FLY", UDim2.fromOffset(12, 44), UDim2.fromOffset(120, 30), COLOR_TAB_OFF)
 local serverTab = makeButton(main, "TabServer", "SERVER", UDim2.fromOffset(138, 44), UDim2.fromOffset(120, 30), COLOR_TAB_OFF)
 local espTab = makeButton(main, "TabESP", "ESP", UDim2.fromOffset(264, 44), UDim2.fromOffset(120, 30), COLOR_TAB_OFF)
-flyTab.TextColor3 = COLOR_TEXT
-serverTab.TextColor3 = COLOR_TEXT
-espTab.TextColor3 = COLOR_TEXT
+local teleportTab = makeButton(main, "TabTeleport", "TELEPORT", UDim2.fromOffset(390, 44), UDim2.fromOffset(120, 30), COLOR_TAB_OFF)
+for _, tab in ipairs({ flyTab, serverTab, espTab, teleportTab }) do
+    tab.TextColor3 = COLOR_TEXT
+end
 
 ---------------------------------------------------------------------
 -- FLY page
@@ -738,6 +739,237 @@ if not ESP.Available then
 end
 
 refreshESPButtons()
+
+---------------------------------------------------------------------
+-- TELEPORT tab: save / load / teleport to local positions
+---------------------------------------------------------------------
+local teleportPage = Instance.new("Frame")
+teleportPage.Name = "TeleportPage"
+teleportPage.Position = UDim2.fromOffset(0, 84)
+teleportPage.Size = UDim2.fromOffset(520, 306)
+teleportPage.BackgroundTransparency = 1
+teleportPage.Visible = false
+teleportPage.Parent = main
+
+local pointNameBox = Instance.new("TextBox")
+pointNameBox.Name = "PointName"
+pointNameBox.Position = UDim2.fromOffset(12, 10)
+pointNameBox.Size = UDim2.fromOffset(330, 34)
+pointNameBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+pointNameBox.BorderSizePixel = 0
+pointNameBox.Font = Enum.Font.Gotham
+pointNameBox.Text = ""
+pointNameBox.PlaceholderText = "Tên điểm dịch chuyển..."
+pointNameBox.ClearTextOnFocus = false
+pointNameBox.TextColor3 = Color3.fromRGB(25, 30, 35)
+pointNameBox.TextSize = 13
+pointNameBox.Parent = teleportPage
+makeCorner(pointNameBox, UDim.new(0, 7))
+
+local savePointBtn = makeButton(teleportPage, "SavePoint", "LƯU VỊ TRÍ",
+    UDim2.fromOffset(352, 10), UDim2.fromOffset(156, 34), COLOR_PLUS, 12)
+
+local teleportStatus = makeLabel(teleportPage, "TeleportStatus", "Đang tải điểm đã lưu...",
+    UDim2.fromOffset(12, 50), UDim2.fromOffset(496, 22), 11)
+teleportStatus.Font = Enum.Font.Gotham
+teleportStatus.TextColor3 = COLOR_HINT
+
+local pointList = Instance.new("ScrollingFrame")
+pointList.Name = "PointList"
+pointList.Position = UDim2.fromOffset(12, 78)
+pointList.Size = UDim2.fromOffset(496, 220)
+pointList.BackgroundColor3 = COLOR_LIST
+pointList.BorderSizePixel = 0
+pointList.CanvasSize = UDim2.new(0, 0, 0, 0)
+pointList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+pointList.ScrollBarThickness = 5
+pointList.Parent = teleportPage
+makeCorner(pointList, UDim.new(0, 8))
+
+local pointLayout = Instance.new("UIListLayout")
+pointLayout.SortOrder = Enum.SortOrder.LayoutOrder
+pointLayout.Padding = UDim.new(0, 6)
+pointLayout.Parent = pointList
+
+local pointPadding = Instance.new("UIPadding")
+pointPadding.PaddingTop = UDim.new(0, 6)
+pointPadding.PaddingLeft = UDim.new(0, 6)
+pointPadding.PaddingRight = UDim.new(0, 6)
+pointPadding.PaddingBottom = UDim.new(0, 6)
+pointPadding.Parent = pointList
+
+local savedPoints = {}
+local pointFile = "VHT_TeleportPoints_" .. tostring(game.PlaceId) .. ".json"
+local fileRead = readfile
+local fileWrite = writefile
+local fileExists = isfile
+local fileStorageAvailable = type(fileRead) == "function"
+    and type(fileWrite) == "function"
+
+local function setTeleportStatus(message)
+    teleportStatus.Text = message
+end
+
+local function persistPoints()
+    if not fileStorageAvailable then
+        setTeleportStatus("Executor không hỗ trợ lưu file; điểm chỉ giữ đến khi thoát script.")
+        return false
+    end
+
+    local ok, err = pcall(function()
+        fileWrite(pointFile, HttpService:JSONEncode(savedPoints))
+    end)
+    if not ok then
+        setTeleportStatus("Không thể ghi file: " .. tostring(err))
+        return false
+    end
+    return true
+end
+
+local function loadPoints()
+    if not fileStorageAvailable then
+        setTeleportStatus("Không có API file; điểm sẽ không được lưu sau khi thoát.")
+        return
+    end
+
+    local ok, result = pcall(function()
+        if type(fileExists) == "function" and not fileExists(pointFile) then
+            return {}
+        end
+        return HttpService:JSONDecode(fileRead(pointFile))
+    end)
+
+    if ok and type(result) == "table" then
+        for _, point in ipairs(result) do
+            if type(point) == "table"
+                and type(point.name) == "string"
+                and type(point.x) == "number"
+                and type(point.y) == "number"
+                and type(point.z) == "number" then
+                table.insert(savedPoints, {
+                    name = point.name,
+                    x = point.x,
+                    y = point.y,
+                    z = point.z,
+                })
+            end
+        end
+    elseif not ok then
+        setTeleportStatus("File điểm lưu bị lỗi hoặc không đọc được: " .. tostring(result))
+    end
+end
+
+local function clearPointRows()
+    for _, child in ipairs(pointList:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+end
+
+local function renderSavedPoints()
+    clearPointRows()
+
+    for index, point in ipairs(savedPoints) do
+        local row = Instance.new("Frame")
+        row.Name = "PointRow_" .. tostring(index)
+        row.Size = UDim2.new(1, 0, 0, 42)
+        row.BackgroundColor3 = COLOR_ROW
+        row.BorderSizePixel = 0
+        row.LayoutOrder = index
+        row.Parent = pointList
+        makeCorner(row, UDim.new(0, 7))
+
+        local info = Instance.new("TextLabel")
+        info.Name = "PointInfo"
+        info.Position = UDim2.fromOffset(9, 0)
+        info.Size = UDim2.new(1, -174, 1, 0)
+        info.BackgroundTransparency = 1
+        info.Font = Enum.Font.Gotham
+        info.Text = string.format("%s  |  %.1f, %.1f, %.1f", point.name, point.x, point.y, point.z)
+        info.TextColor3 = COLOR_TEXT
+        info.TextSize = 11
+        info.TextXAlignment = Enum.TextXAlignment.Left
+        info.TextTruncate = Enum.TextTruncate.AtEnd
+        info.Parent = row
+
+        local goButton = makeButton(row, "Go", "ĐẾN", UDim2.new(1, -158, 0.5, -15),
+            UDim2.fromOffset(72, 30), COLOR_PLUS, 11)
+        local deleteButton = makeButton(row, "Delete", "XÓA", UDim2.new(1, -80, 0.5, -15),
+            UDim2.fromOffset(70, 30), COLOR_CLOSE, 11)
+
+        goButton.Activated:Connect(function()
+            local currentCharacter = player.Character
+            local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+            if not currentRoot then
+                setTeleportStatus("Không tìm thấy nhân vật; hãy đợi nhân vật tải xong.")
+                return
+            end
+
+            local destination = Vector3.new(point.x, point.y, point.z)
+            local ok, err = pcall(function()
+                currentRoot.CFrame = CFrame.new(destination + Vector3.new(0, 3, 0))
+            end)
+            if ok then
+                setTeleportStatus("Đã dịch chuyển đến: " .. point.name)
+            else
+                setTeleportStatus("Teleport thất bại: " .. tostring(err))
+            end
+        end)
+
+        deleteButton.Activated:Connect(function()
+            for pointIndex, savedPoint in ipairs(savedPoints) do
+                if savedPoint == point then
+                    table.remove(savedPoints, pointIndex)
+                    break
+                end
+            end
+            persistPoints()
+            renderSavedPoints()
+            setTeleportStatus("Đã xóa điểm: " .. point.name)
+        end)
+    end
+
+    if #savedPoints == 0 then
+        setTeleportStatus("Chưa có điểm nào. Đứng tại vị trí muốn lưu rồi nhấn LƯU VỊ TRÍ.")
+    elseif fileStorageAvailable then
+        setTeleportStatus(string.format("Đã lưu %d điểm | Tự động lưu theo PlaceId này.", #savedPoints))
+    end
+end
+
+savePointBtn.Activated:Connect(function()
+    local currentCharacter = player.Character
+    local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+    if not currentRoot then
+        setTeleportStatus("Không thể lưu: nhân vật chưa tải xong.")
+        return
+    end
+
+    local pointName = pointNameBox.Text:gsub("^%s+", ""):gsub("%s+$", "")
+    if pointName == "" then
+        pointName = "Điểm " .. tostring(#savedPoints + 1)
+    end
+
+    local position = currentRoot.Position
+    table.insert(savedPoints, {
+        name = pointName,
+        x = position.X,
+        y = position.Y,
+        z = position.Z,
+    })
+
+    local savedToDisk = persistPoints()
+    renderSavedPoints()
+    if savedToDisk then
+        setTeleportStatus("Đã lưu điểm: " .. pointName)
+    else
+        setTeleportStatus("Đã lưu tạm điểm: " .. pointName .. " (không ghi được file).")
+    end
+    pointNameBox.Text = ""
+end)
+
+loadPoints()
+renderSavedPoints()
 
 ---------------------------------------------------------------------
 -- Visual state helpers (FLY / NOCLIP)
@@ -1295,10 +1527,12 @@ local function showTab(tabName)
     flyPage.Visible = tabName == "FLY"
     serverPage.Visible = tabName == "SERVER"
     espPage.Visible = tabName == "ESP"
+    teleportPage.Visible = tabName == "TELEPORT"
 
     flyTab.BackgroundColor3 = tabName == "FLY" and COLOR_TAB_ON or COLOR_TAB_OFF
     serverTab.BackgroundColor3 = tabName == "SERVER" and COLOR_TAB_ON or COLOR_TAB_OFF
     espTab.BackgroundColor3 = tabName == "ESP" and COLOR_TAB_ON or COLOR_TAB_OFF
+    teleportTab.BackgroundColor3 = tabName == "TELEPORT" and COLOR_TAB_ON or COLOR_TAB_OFF
 
     if tabName == "SERVER" and not serverLoaded then
         loadServers()
@@ -1316,6 +1550,7 @@ noclipButton.Activated:Connect(toggleNoclip)
 flyTab.Activated:Connect(function() showTab("FLY") end)
 serverTab.Activated:Connect(function() showTab("SERVER") end)
 espTab.Activated:Connect(function() showTab("ESP") end)
+teleportTab.Activated:Connect(function() showTab("TELEPORT") end)
 refreshBtn.Activated:Connect(loadServers)
 minimizeBtn.Activated:Connect(minimizeWindow)
 
