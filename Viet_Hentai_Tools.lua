@@ -275,11 +275,12 @@ local minimizeBtn = makeButton(main, "Minimize", "-", UDim2.fromOffset(448, 8), 
 local closeBtn = makeButton(main, "Close", "X", UDim2.fromOffset(482, 8), UDim2.fromOffset(30, 26), COLOR_CLOSE)
 
 -- Tabs
-local flyTab = makeButton(main, "TabFly", "FLY", UDim2.fromOffset(12, 44), UDim2.fromOffset(120, 30), COLOR_TAB_OFF)
-local serverTab = makeButton(main, "TabServer", "SERVER", UDim2.fromOffset(138, 44), UDim2.fromOffset(120, 30), COLOR_TAB_OFF)
-local espTab = makeButton(main, "TabESP", "ESP", UDim2.fromOffset(264, 44), UDim2.fromOffset(120, 30), COLOR_TAB_OFF)
-local teleportTab = makeButton(main, "TabTeleport", "TELEPORT", UDim2.fromOffset(390, 44), UDim2.fromOffset(120, 30), COLOR_TAB_OFF)
-for _, tab in ipairs({ flyTab, serverTab, espTab, teleportTab }) do
+local flyTab = makeButton(main, "TabFly", "FLY", UDim2.fromOffset(12, 44), UDim2.fromOffset(96, 30), COLOR_TAB_OFF, 12)
+local serverTab = makeButton(main, "TabServer", "SERVER", UDim2.fromOffset(112, 44), UDim2.fromOffset(96, 30), COLOR_TAB_OFF, 12)
+local espTab = makeButton(main, "TabESP", "ESP", UDim2.fromOffset(212, 44), UDim2.fromOffset(96, 30), COLOR_TAB_OFF, 12)
+local teleportTab = makeButton(main, "TabTeleport", "TELEPORT", UDim2.fromOffset(312, 44), UDim2.fromOffset(96, 30), COLOR_TAB_OFF, 11)
+local speedTab = makeButton(main, "TabSpeed", "SPEED", UDim2.fromOffset(412, 44), UDim2.fromOffset(96, 30), COLOR_TAB_OFF, 12)
+for _, tab in ipairs({ flyTab, serverTab, espTab, teleportTab, speedTab }) do
     tab.TextColor3 = COLOR_TEXT
 end
 
@@ -972,6 +973,195 @@ loadPoints()
 renderSavedPoints()
 
 ---------------------------------------------------------------------
+-- SPEED tab: numeric WalkSpeed + mutually-exclusive application methods
+---------------------------------------------------------------------
+local speedPage = Instance.new("Frame")
+speedPage.Name = "SpeedPage"
+speedPage.Position = UDim2.fromOffset(0, 84)
+speedPage.Size = UDim2.fromOffset(520, 306)
+speedPage.BackgroundTransparency = 1
+speedPage.Visible = false
+speedPage.Parent = main
+
+makeLabel(speedPage, "SpeedTitle", "TỐC ĐỘ DI CHUYỂN", UDim2.fromOffset(12, 12),
+    UDim2.fromOffset(496, 24), 15)
+
+local walkSpeedBox = Instance.new("TextBox")
+walkSpeedBox.Name = "WalkSpeedBox"
+walkSpeedBox.Position = UDim2.fromOffset(12, 48)
+walkSpeedBox.Size = UDim2.fromOffset(330, 38)
+walkSpeedBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+walkSpeedBox.BorderSizePixel = 0
+walkSpeedBox.Font = Enum.Font.GothamBold
+walkSpeedBox.Text = "32"
+walkSpeedBox.PlaceholderText = "Nhập WalkSpeed (0.1 - 500)"
+walkSpeedBox.ClearTextOnFocus = false
+walkSpeedBox.TextColor3 = Color3.fromRGB(25, 30, 35)
+walkSpeedBox.TextSize = 15
+walkSpeedBox.Parent = speedPage
+makeCorner(walkSpeedBox, UDim.new(0, 7))
+
+local applySpeedBtn = makeButton(speedPage, "ApplyWalkSpeed", "ÁP DỤNG",
+    UDim2.fromOffset(352, 48), UDim2.fromOffset(156, 38), COLOR_PLUS, 13)
+
+local speedModeLabel = makeLabel(speedPage, "SpeedModeLabel", "PHƯƠNG PHÁP ÁP DỤNG (CHỌN 1)",
+    UDim2.fromOffset(12, 102), UDim2.fromOffset(496, 22), 12)
+speedModeLabel.TextColor3 = COLOR_HINT
+
+local directSpeedBtn = makeButton(speedPage, "SpeedModeDirect", "CÁCH 1: ĐẶT WALKSpeed",
+    UDim2.fromOffset(12, 132), UDim2.fromOffset(244, 44), COLOR_NOCLIP_OFF, 12)
+local loopSpeedBtn = makeButton(speedPage, "SpeedModeLoop", "CÁCH 2: GIỮ WALKSpeed",
+    UDim2.fromOffset(264, 132), UDim2.fromOffset(244, 44), COLOR_NOCLIP_OFF, 12)
+
+local speedStatus = makeLabel(speedPage, "SpeedStatus", "Nhập tốc độ rồi nhấn ÁP DỤNG.",
+    UDim2.fromOffset(12, 190), UDim2.fromOffset(496, 34), 12)
+speedStatus.Font = Enum.Font.Gotham
+speedStatus.TextColor3 = COLOR_HINT
+speedStatus.TextWrapped = true
+
+local SPEED_MIN = 0.1
+local SPEED_MAX = 500
+local requestedWalkSpeed = 32
+local speedMode = nil -- nil / "direct" / "loop"
+local speedConnection = nil
+local originalWalkSpeed = nil
+local speedTargetHumanoid = nil
+
+local function setSpeedStatus(message)
+    speedStatus.Text = message
+end
+
+local function updateSpeedModeButtons()
+    directSpeedBtn.Text = "CÁCH 1: ĐẶT WALKSpeed" .. (speedMode == "direct" and " [ON]" or " [OFF]")
+    loopSpeedBtn.Text = "CÁCH 2: GIỮ WALKSpeed" .. (speedMode == "loop" and " [ON]" or " [OFF]")
+    directSpeedBtn.BackgroundColor3 = speedMode == "direct" and COLOR_FLY_ON or COLOR_NOCLIP_OFF
+    loopSpeedBtn.BackgroundColor3 = speedMode == "loop" and COLOR_FLY_ON or COLOR_NOCLIP_OFF
+end
+
+local function captureSpeedBaseline(hum)
+    if speedTargetHumanoid ~= hum then
+        speedTargetHumanoid = hum
+        originalWalkSpeed = hum and hum.WalkSpeed or nil
+    end
+end
+
+local function applyRequestedWalkSpeed()
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then
+        setSpeedStatus("Chưa tìm thấy Humanoid. Hãy đợi nhân vật tải xong.")
+        return false
+    end
+    captureSpeedBaseline(hum)
+    local ok, err = pcall(function()
+        hum.WalkSpeed = requestedWalkSpeed
+    end)
+    if not ok then
+        setSpeedStatus("Không thể đặt WalkSpeed: " .. tostring(err))
+        return false
+    end
+    return true
+end
+
+local function stopSpeedMode(restore)
+    if speedConnection then
+        speedConnection:Disconnect()
+        speedConnection = nil
+    end
+
+    local hum = speedTargetHumanoid
+    if restore and hum and hum.Parent and originalWalkSpeed then
+        pcall(function()
+            hum.WalkSpeed = originalWalkSpeed
+        end)
+    end
+
+    speedMode = nil
+    speedTargetHumanoid = nil
+    originalWalkSpeed = nil
+    updateSpeedModeButtons()
+end
+
+local function setSpeedMode(mode)
+    if speedMode == mode then
+        stopSpeedMode(true)
+        setSpeedStatus("Đã tắt chế độ tăng tốc và khôi phục tốc độ trước đó.")
+        return
+    end
+
+    stopSpeedMode(true)
+    local char = player.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then
+        setSpeedStatus("Chưa tìm thấy nhân vật. Hãy thử bật lại sau.")
+        return
+    end
+
+    speedMode = mode
+    captureSpeedBaseline(hum)
+    if not applyRequestedWalkSpeed() then
+        stopSpeedMode(false)
+        return
+    end
+
+    if mode == "loop" then
+        speedConnection = RunService.Heartbeat:Connect(function()
+            local currentCharacter = player.Character
+            local currentHumanoid = currentCharacter and currentCharacter:FindFirstChildOfClass("Humanoid")
+            if currentHumanoid then
+                captureSpeedBaseline(currentHumanoid)
+                if currentHumanoid.WalkSpeed ~= requestedWalkSpeed then
+                    pcall(function()
+                        currentHumanoid.WalkSpeed = requestedWalkSpeed
+                    end)
+                end
+            end
+        end)
+        setSpeedStatus(string.format("Đang bật giữ tốc độ %.1f. Nếu game ghi đè WalkSpeed, script sẽ đặt lại mỗi frame.", requestedWalkSpeed))
+    else
+        setSpeedStatus(string.format("Đã đặt WalkSpeed = %.1f một lần. Nếu game tự ghi đè, hãy thử CÁCH 2.", requestedWalkSpeed))
+    end
+    updateSpeedModeButtons()
+end
+
+local function readRequestedWalkSpeed()
+    local value = tonumber(walkSpeedBox.Text)
+    if not value or value < SPEED_MIN or value > SPEED_MAX then
+        setSpeedStatus("Giá trị không hợp lệ. Hãy nhập số từ 0.1 đến 500.")
+        walkSpeedBox.Text = tostring(requestedWalkSpeed)
+        return false
+    end
+    requestedWalkSpeed = value
+    walkSpeedBox.Text = tostring(requestedWalkSpeed)
+    if speedMode then
+        local activeMode = speedMode
+        setSpeedMode(activeMode)
+        if speedMode ~= activeMode then
+            setSpeedMode(activeMode)
+        end
+        setSpeedStatus(string.format("Đã cập nhật tốc độ: %.1f | Phương pháp: %s",
+            requestedWalkSpeed, activeMode == "loop" and "Giữ WalkSpeed" or "Đặt một lần"))
+    else
+        setSpeedStatus(string.format("Đã lưu mức tốc độ %.1f. Chọn một phương pháp để bật.", requestedWalkSpeed))
+    end
+    return true
+end
+
+applySpeedBtn.Activated:Connect(readRequestedWalkSpeed)
+walkSpeedBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        readRequestedWalkSpeed()
+    end
+end)
+directSpeedBtn.Activated:Connect(function()
+    setSpeedMode("direct")
+end)
+loopSpeedBtn.Activated:Connect(function()
+    setSpeedMode("loop")
+end)
+updateSpeedModeButtons()
+
+---------------------------------------------------------------------
 -- Visual state helpers (FLY / NOCLIP)
 ---------------------------------------------------------------------
 local function refreshToggles()
@@ -1528,11 +1718,13 @@ local function showTab(tabName)
     serverPage.Visible = tabName == "SERVER"
     espPage.Visible = tabName == "ESP"
     teleportPage.Visible = tabName == "TELEPORT"
+    speedPage.Visible = tabName == "SPEED"
 
     flyTab.BackgroundColor3 = tabName == "FLY" and COLOR_TAB_ON or COLOR_TAB_OFF
     serverTab.BackgroundColor3 = tabName == "SERVER" and COLOR_TAB_ON or COLOR_TAB_OFF
     espTab.BackgroundColor3 = tabName == "ESP" and COLOR_TAB_ON or COLOR_TAB_OFF
     teleportTab.BackgroundColor3 = tabName == "TELEPORT" and COLOR_TAB_ON or COLOR_TAB_OFF
+    speedTab.BackgroundColor3 = tabName == "SPEED" and COLOR_TAB_ON or COLOR_TAB_OFF
 
     if tabName == "SERVER" and not serverLoaded then
         loadServers()
@@ -1551,6 +1743,7 @@ flyTab.Activated:Connect(function() showTab("FLY") end)
 serverTab.Activated:Connect(function() showTab("SERVER") end)
 espTab.Activated:Connect(function() showTab("ESP") end)
 teleportTab.Activated:Connect(function() showTab("TELEPORT") end)
+speedTab.Activated:Connect(function() showTab("SPEED") end)
 refreshBtn.Activated:Connect(loadServers)
 minimizeBtn.Activated:Connect(minimizeWindow)
 
@@ -1590,6 +1783,7 @@ closeBtn.Activated:Connect(function()
     -- Luôn tắt NoClip và ESP để khôi phục trạng thái trước khi đóng.
     setNoclip(false)
     ESP.Destroy()
+    stopSpeedMode(true)
 
     if windowOpen then
         windowOpen = false
@@ -1614,4 +1808,18 @@ player.CharacterAdded:Connect(function(newCharacter)
     character = newCharacter
     humanoid = nil
     root = nil
+
+    if speedMode then
+        task.defer(function()
+            local newHumanoid = newCharacter:WaitForChild("Humanoid", 10)
+            if newHumanoid and speedMode then
+                speedTargetHumanoid = nil
+                originalWalkSpeed = nil
+                captureSpeedBaseline(newHumanoid)
+                pcall(function()
+                    newHumanoid.WalkSpeed = requestedWalkSpeed
+                end)
+            end
+        end)
+    end
 end)
