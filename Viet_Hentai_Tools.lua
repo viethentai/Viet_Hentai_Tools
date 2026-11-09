@@ -42,7 +42,7 @@ local MAX_DISPLAY = 100
 local DEFAULT_DISPLAY = 20
 local PROMPT_SEARCH_RADIUS = 32
 
-local WINDOW_SIZE = UDim2.fromOffset(520, 400)
+local WINDOW_SIZE = UDim2.fromOffset(520, 470)
 local BUBBLE_SIZE = UDim2.fromOffset(52, 52)
 local TWEEN_MINIMIZE = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 local TWEEN_RESTORE = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -256,14 +256,15 @@ ZM.originalMax = player.CameraMaxZoomDistance
 ZM.originalMin = player.CameraMinZoomDistance
 ZM.firstPerson = false
 
-local flyTab = makeButton(main, "TabFly", "FLY", UDim2.fromOffset(12, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
-local serverTab = makeButton(main, "TabServer", "SERVER", UDim2.fromOffset(84, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
-local espTab = makeButton(main, "TabESP", "ESP", UDim2.fromOffset(156, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
-local teleportTab = makeButton(main, "TabTeleport", "TELEPORT", UDim2.fromOffset(228, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
-local speedTab = makeButton(main, "TabSpeed", "SPEED", UDim2.fromOffset(300, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
-ZM.tab = makeButton(main, "TabZoom", "ZOOM", UDim2.fromOffset(372, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
-SET.tab = makeButton(main, "TabSetting", "SETTING", UDim2.fromOffset(444, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
-for _, tab in ipairs({ flyTab, serverTab, espTab, teleportTab, speedTab, ZM.tab, SET.tab }) do
+local flyTab = makeButton(main, "TabFly", "FLY", UDim2.fromOffset(14, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+local serverTab = makeButton(main, "TabServer", "SERVER", UDim2.fromOffset(76, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+local espTab = makeButton(main, "TabESP", "ESP", UDim2.fromOffset(138, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+local teleportTab = makeButton(main, "TabTeleport", "TELEPORT", UDim2.fromOffset(200, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+local speedTab = makeButton(main, "TabSpeed", "SPEED", UDim2.fromOffset(262, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+ZM.tab = makeButton(main, "TabZoom", "ZOOM", UDim2.fromOffset(324, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+local aimTab = makeButton(main, "TabAim", "AIM", UDim2.fromOffset(386, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+SET.tab = makeButton(main, "TabSetting", "SET", UDim2.fromOffset(448, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+for _, tab in ipairs({ flyTab, serverTab, espTab, teleportTab, speedTab, ZM.tab, aimTab, SET.tab }) do
     tab.TextColor3 = COLOR_TEXT
 end
 
@@ -645,7 +646,7 @@ Players.PlayerRemoving:Connect(removeESP)
 local espPage = Instance.new("Frame")
 espPage.Name = "ESPPage"
 espPage.Position = UDim2.fromOffset(0, 84)
-espPage.Size = UDim2.fromOffset(520, 306)
+espPage.Size = UDim2.fromOffset(520, 376)
 espPage.BackgroundTransparency = 1
 espPage.Visible = false
 espPage.Parent = main
@@ -689,7 +690,7 @@ for i, item in ipairs(espToggles) do
 end
 
 local espHint = makeLabel(espPage, "Hint", "G: bật/tắt ESP",
-    UDim2.fromOffset(12, 200), UDim2.fromOffset(496, 22), 11)
+    UDim2.fromOffset(12, 190), UDim2.fromOffset(496, 18), 10)
 espHint.Font = Enum.Font.Gotham
 espHint.TextColor3 = COLOR_HINT
 espHint.TextXAlignment = Enum.TextXAlignment.Center
@@ -699,6 +700,853 @@ if not ESP.Available then
 end
 
 refreshESPButtons()
+
+-- =====================================================================
+-- AIM ASSIST (Player + NPC) - phần viết lại
+-- Gồm: chọn đối tượng, FOV, độ mượt, dự đoán, vùng chết, kiểm tra vật cản,
+-- ưu tiên mục tiêu, bỏ qua đồng đội, vòng FOV và phím bật/tắt riêng.
+-- =====================================================================
+
+local Aim
+
+do
+
+    local AIM_MODES = { "BOTH", "PLAYERS", "NPCS" }
+    local AIM_MODE_TEXT = {
+        BOTH = "PLAYER + NPC",
+        PLAYERS = "CHỈ PLAYER",
+        NPCS = "CHỈ NPC",
+    }
+
+    local AIM_PARTS = { "HEAD", "TORSO", "AUTO" }
+    local AIM_PART_TEXT = {
+        HEAD = "ĐẦU",
+        TORSO = "THÂN",
+        AUTO = "TỰ ĐỘNG",
+    }
+
+    local AIM_PRIORITIES = { "FOV", "DISTANCE", "HEALTH" }
+    local AIM_PRIORITY_TEXT = {
+        FOV = "GẦN TÂM",
+        DISTANCE = "GẦN NHẤT",
+        HEALTH = "MÁU THẤP NHẤT",
+    }
+
+    local AIM_ACTIVATIONS = { "HOLD", "ALWAYS" }
+    local AIM_ACTIVATION_TEXT = {
+        HOLD = "GIỮ CHUỘT PHẢI",
+        ALWAYS = "LUÔN BẬT",
+    }
+
+    Aim = {
+        Enabled = false,
+        Mode = "BOTH",            -- BOTH | PLAYERS | NPCS
+        FOV = 120,                -- bán kính vòng ngắm (pixel)
+        Smoothness = 8,           -- 1 = bám ngay, 30 = rất mượt
+        MaxDistance = 500,        -- studs
+        MinDistance = 0,          -- bỏ qua mục tiêu quá gần
+        Prediction = 0,           -- giây dự đoán trước theo vận tốc
+        Deadzone = 4,             -- pixel quanh tâm thì ngừng xoay
+        TargetPart = "HEAD",      -- HEAD | TORSO | AUTO
+        Priority = "FOV",         -- FOV | DISTANCE | HEALTH
+        VisibilityCheck = true,
+        TeamCheck = true,
+        ShowCircle = true,
+        ActivateMode = "HOLD",    -- HOLD | ALWAYS
+        ToggleKey = Enum.KeyCode.H,
+        Capturing = false,
+        Holding = false,
+        Locked = false,
+        CurrentModel = nil,
+        CurrentDistance = 0,
+        TargetName = "",
+        TargetKind = "",
+        NPCs = {},
+        Circle = nil,
+    }
+
+    local AIM_STICKINESS = 0.8   -- mục tiêu mới phải tốt hơn 20% mới đổi
+    local AIM_SWITCH_RATIO = AIM_STICKINESS
+
+    local aimStatus
+    local aimNumbers = {}
+
+    local function setAimStatus(message)
+        if aimStatus then
+            aimStatus.Text = message
+        end
+    end
+
+    local function cycleValue(list, current)
+        for index = 1, #list do
+            if list[index] == current then
+                return list[index % #list + 1]
+            end
+        end
+        return list[1]
+    end
+
+    local function formatAimNumber(spec, value)
+        if spec.decimals then
+            return string.format("%.2f", value)
+        end
+        return tostring(math.floor(value + 0.5))
+    end
+
+    local espAimNote = makeLabel(espPage, "AimMovedNote",
+        "Aim Assist đã chuyển sang tab AIM ở thanh tab phía trên.",
+        UDim2.fromOffset(12, 214), UDim2.fromOffset(496, 20), 10)
+    espAimNote.Font = Enum.Font.Gotham
+    espAimNote.TextColor3 = COLOR_HINT
+    espAimNote.TextXAlignment = Enum.TextXAlignment.Center
+
+    local aimPage = Instance.new("Frame")
+    aimPage.Name = "AimPage"
+    aimPage.Position = UDim2.fromOffset(0, 84)
+    aimPage.Size = UDim2.fromOffset(520, 386)
+    aimPage.BackgroundTransparency = 1
+    aimPage.Visible = false
+    aimPage.Parent = main
+
+    local aimScroll = Instance.new("ScrollingFrame")
+    aimScroll.Name = "AimScroll"
+    aimScroll.Position = UDim2.fromOffset(8, 6)
+    aimScroll.Size = UDim2.fromOffset(504, 336)
+    aimScroll.BackgroundColor3 = COLOR_LIST
+    aimScroll.BorderSizePixel = 0
+    aimScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    aimScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    aimScroll.ScrollBarThickness = 4
+    aimScroll.ScrollBarImageColor3 = COLOR_HINT
+    aimScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    aimScroll.Parent = aimPage
+    makeCorner(aimScroll, UDim.new(0, 8))
+
+    local aimLayout = Instance.new("UIListLayout")
+    aimLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    aimLayout.Padding = UDim.new(0, 5)
+    aimLayout.Parent = aimScroll
+
+    local aimPadding = Instance.new("UIPadding")
+    aimPadding.PaddingTop = UDim.new(0, 6)
+    aimPadding.PaddingLeft = UDim.new(0, 6)
+    aimPadding.PaddingRight = UDim.new(0, 6)
+    aimPadding.PaddingBottom = UDim.new(0, 6)
+    aimPadding.Parent = aimScroll
+
+    local aimRowOrder = 0
+
+    local function addAimRow(name, height)
+        aimRowOrder += 1
+
+        local row = Instance.new("Frame")
+        row.Name = name
+        row.Size = UDim2.new(1, 0, 0, height)
+        row.BackgroundColor3 = COLOR_ROW
+        row.BorderSizePixel = 0
+        row.LayoutOrder = aimRowOrder
+        row.Parent = aimScroll
+        makeCorner(row, UDim.new(0, 6))
+
+        return row
+    end
+
+    local function addAimButton(name, text, color, height, textSize)
+        local row = addAimRow(name, height)
+        return makeButton(row, name .. "Button", text,
+            UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 1, 0), color, textSize or 12)
+    end
+
+    local function addAimNumber(name, labelText, key, minValue, maxValue, decimals)
+        local row = addAimRow(name, 34)
+
+        local label = Instance.new("TextLabel")
+        label.Name = "Label"
+        label.Position = UDim2.fromOffset(10, 0)
+        label.Size = UDim2.new(0, 178, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.GothamBold
+        label.Text = labelText
+        label.TextColor3 = COLOR_TEXT
+        label.TextSize = 11
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.TextTruncate = Enum.TextTruncate.AtEnd
+        label.Parent = row
+
+        local box = Instance.new("TextBox")
+        box.Name = "Input"
+        box.Position = UDim2.fromOffset(192, 4)
+        box.Size = UDim2.new(1, -202, 1, -8)
+        box.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+        box.BorderSizePixel = 0
+        box.Font = Enum.Font.GothamBold
+        box.TextColor3 = Color3.fromRGB(25, 30, 35)
+        box.TextSize = 12
+        box.ClearTextOnFocus = false
+        box.PlaceholderText = string.format("%s - %s", tostring(minValue), tostring(maxValue))
+        box.Parent = row
+        makeCorner(box, UDim.new(0, 6))
+
+        local spec = {
+            box = box,
+            key = key,
+            min = minValue,
+            max = maxValue,
+            decimals = decimals,
+            label = labelText,
+        }
+        spec.box.Text = formatAimNumber(spec, Aim[key])
+        table.insert(aimNumbers, spec)
+
+        return box
+    end
+
+    local aimToggleBtn = addAimButton("AimToggle", "AIM ASSIST: OFF", COLOR_NOCLIP_OFF, 42, 14)
+    local aimModeBtn = addAimButton("AimMode", "", COLOR_MINUS, 34, 12)
+    local aimActivationBtn = addAimButton("AimActivation", "", COLOR_MINUS, 34, 12)
+    local aimKeyBtn = addAimButton("AimKeybind", "", COLOR_TAB_OFF, 30, 11)
+    local aimPartBtn = addAimButton("AimPart", "", COLOR_MINUS, 34, 12)
+    local aimPriorityBtn = addAimButton("AimPriority", "", COLOR_MINUS, 34, 12)
+    local aimVisibilityBtn = addAimButton("AimVisibility", "", COLOR_FLY_ON, 34, 12)
+    local aimTeamBtn = addAimButton("AimTeam", "", COLOR_FLY_ON, 34, 12)
+    local aimCircleBtn = addAimButton("AimCircle", "", COLOR_FLY_ON, 34, 12)
+
+    addAimNumber("AimFOV", "FOV (bán kính, px)", "FOV", 20, 800, false)
+    addAimNumber("AimSmooth", "Độ mượt (1 - 30)", "Smoothness", 1, 30, false)
+    addAimNumber("AimDistance", "Khoảng cách tối đa", "MaxDistance", 10, 5000, false)
+    addAimNumber("AimMinDistance", "Khoảng cách tối thiểu", "MinDistance", 0, 500, false)
+    addAimNumber("AimPrediction", "Dự đoán trước (giây)", "Prediction", 0, 1, true)
+    addAimNumber("AimDeadzone", "Vùng chết (px)", "Deadzone", 0, 100, false)
+
+    aimStatus = makeLabel(aimPage, "AimStatus",
+        "Aim Assist sẵn sàng. Giữ chuột phải để ngắm.",
+        UDim2.fromOffset(10, 348), UDim2.fromOffset(500, 32), 10)
+    aimStatus.Font = Enum.Font.Gotham
+    aimStatus.TextColor3 = COLOR_HINT
+    aimStatus.TextXAlignment = Enum.TextXAlignment.Center
+    aimStatus.TextWrapped = true
+
+    local function applyAimNumber(spec)
+        local value = tonumber(spec.box.Text)
+        if not value then
+            spec.box.Text = formatAimNumber(spec, Aim[spec.key])
+            setAimStatus("Giá trị không hợp lệ cho " .. spec.label .. ".")
+            return false
+        end
+
+        value = math.clamp(value, spec.min, spec.max)
+        if not spec.decimals then
+            value = math.floor(value + 0.5)
+        end
+
+        Aim[spec.key] = value
+        spec.box.Text = formatAimNumber(spec, value)
+
+        if spec.key == "FOV" and Aim.Circle then
+            Aim.Circle.Radius = Aim.FOV
+        end
+
+        return true
+    end
+
+    for _, spec in ipairs(aimNumbers) do
+        spec.box.FocusLost:Connect(function()
+            if applyAimNumber(spec) then
+                setAimStatus(spec.label .. ": " .. formatAimNumber(spec, Aim[spec.key]))
+            end
+        end)
+    end
+
+    pcall(function()
+        if type(Drawing) == "table" and type(Drawing.new) == "function" then
+            local circle = Drawing.new("Circle")
+            circle.NumSides = 64
+            circle.Thickness = 1.5
+            circle.Filled = false
+            circle.Color = Color3.fromRGB(90, 200, 255)
+            circle.Transparency = 0.85
+            circle.Visible = false
+            Aim.Circle = circle
+        end
+    end)
+
+    local aimPool = {}
+    local aimRayParams = RaycastParams.new()
+    aimRayParams.FilterType = Enum.RaycastFilterType.Exclude
+    aimRayParams.IgnoreWater = true
+
+    local aimRayFilter = {}
+
+    local function isInsidePlayerCharacter(model, playerCharacters)
+        local parent = model.Parent
+        while parent and parent ~= workspace do
+            if playerCharacters[parent] then
+                return true
+            end
+            parent = parent.Parent
+        end
+        return false
+    end
+
+    local function rebuildAimTargets()
+        local playerCharacters = {}
+        for _, otherPlayer in ipairs(Players:GetPlayers()) do
+            local character = otherPlayer.Character
+            if character then
+                playerCharacters[character] = true
+            end
+        end
+
+        local found = {}
+        local ok = pcall(function()
+            for _, instance in ipairs(workspace:GetDescendants()) do
+                if instance:IsA("Model") and not playerCharacters[instance] then
+                    local humanoid = instance:FindFirstChildOfClass("Humanoid")
+                    if humanoid and humanoid.Health > 0
+                        and not isInsidePlayerCharacter(instance, playerCharacters) then
+                        found[#found + 1] = instance
+                    end
+                end
+            end
+        end)
+
+        if ok then
+            Aim.NPCs = found
+        end
+    end
+
+    local AIM_HEAD_PARTS = { "Head", "HumanoidRootPart" }
+    local AIM_TORSO_PARTS = { "UpperTorso", "Torso", "HumanoidRootPart" }
+    local AIM_AUTO_PARTS = { "Head", "UpperTorso", "Torso", "HumanoidRootPart" }
+
+    local function getAimPartList()
+        if Aim.TargetPart == "TORSO" then
+            return AIM_TORSO_PARTS
+        end
+        if Aim.TargetPart == "AUTO" then
+            return AIM_AUTO_PARTS
+        end
+        return AIM_HEAD_PARTS
+    end
+
+    local function chooseAimPart(model, camera, center)
+        local partNames = getAimPartList()
+        local bestPart = nil
+        local bestOffset = nil
+
+        for index = 1, #partNames do
+            local part = model:FindFirstChild(partNames[index])
+            if part and part:IsA("BasePart") then
+                local viewportPoint = camera:WorldToViewportPoint(part.Position)
+                if viewportPoint.Z > 0 then
+                    local screenPosition = Vector2.new(viewportPoint.X, viewportPoint.Y)
+                    local offset = (screenPosition - center).Magnitude
+                    if offset <= Aim.FOV and (bestOffset == nil or offset < bestOffset) then
+                        bestPart = part
+                        bestOffset = offset
+                    end
+                end
+
+                -- Chế độ cố định: chỉ dùng phần đầu tiên tồn tại trên model.
+                if Aim.TargetPart ~= "AUTO" then
+                    break
+                end
+            end
+        end
+
+        return bestPart, bestOffset
+    end
+
+    local function isAimPathClear(camera, model, position)
+        if not Aim.VisibilityCheck then
+            return true
+        end
+
+        table.clear(aimRayFilter)
+        local localCharacter = player.Character
+        if localCharacter then
+            aimRayFilter[1] = localCharacter
+        end
+        aimRayParams.FilterDescendantsInstances = aimRayFilter
+
+        local origin = camera.CFrame.Position
+        local hit = workspace:Raycast(origin, position - origin, aimRayParams)
+        if not hit then
+            return true
+        end
+
+        return hit.Instance ~= nil and hit.Instance:IsDescendantOf(model)
+    end
+
+    local function collectAimCandidates(camera, origin, center)
+        local count = 0
+        local biasScore = nil
+
+        local function consider(model)
+            local humanoid = model:FindFirstChildOfClass("Humanoid")
+            if not humanoid or humanoid.Health <= 0 then
+                return
+            end
+
+            local rootPart = model:FindFirstChild("HumanoidRootPart")
+            if not rootPart then
+                return
+            end
+
+            local otherPlayer = Players:GetPlayerFromCharacter(model)
+            if Aim.TeamCheck and otherPlayer and player.Team
+                and otherPlayer.Team == player.Team then
+                return
+            end
+
+            local distance = (rootPart.Position - origin).Magnitude
+            if distance < Aim.MinDistance or distance > Aim.MaxDistance then
+                return
+            end
+
+            local part, screenDistance = chooseAimPart(model, camera, center)
+            if not part then
+                return
+            end
+
+            local score
+            if Aim.Priority == "DISTANCE" then
+                score = distance
+            elseif Aim.Priority == "HEALTH" then
+                score = math.max(humanoid.Health, 0)
+            else
+                score = screenDistance
+            end
+
+            count += 1
+            local entry = aimPool[count]
+            if not entry then
+                entry = {}
+                aimPool[count] = entry
+            end
+
+            entry.model = model
+            entry.humanoid = humanoid
+            entry.part = part
+            entry.distance = distance
+            entry.score = score
+            entry.isPlayer = otherPlayer ~= nil
+
+            if model == Aim.CurrentModel then
+                biasScore = score
+            end
+        end
+
+        if Aim.Mode ~= "NPCS" then
+            for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                if otherPlayer ~= player then
+                    local character = otherPlayer.Character
+                    if character and character.Parent then
+                        consider(character)
+                    end
+                end
+            end
+        end
+
+        if Aim.Mode ~= "PLAYERS" then
+            local npcs = Aim.NPCs
+            for index = 1, #npcs do
+                local model = npcs[index]
+                if model.Parent then
+                    consider(model)
+                end
+            end
+        end
+
+        for index = count + 1, #aimPool do
+            aimPool[index] = nil
+        end
+
+        if count > 1 then
+            table.sort(aimPool, function(a, b)
+                return a.score < b.score
+            end)
+        end
+
+        return count, biasScore
+    end
+
+    local function pickAimTarget(count, biasScore, camera)
+        if biasScore then
+            for index = 1, count do
+                local entry = aimPool[index]
+                local isCurrent = entry.model == Aim.CurrentModel
+                if isCurrent or entry.score < biasScore * AIM_SWITCH_RATIO then
+                    if isAimPathClear(camera, entry.model, entry.part.Position) then
+                        return entry
+                    end
+                end
+            end
+        end
+
+        for index = 1, count do
+            local entry = aimPool[index]
+            if isAimPathClear(camera, entry.model, entry.part.Position) then
+                return entry
+            end
+        end
+
+        return nil
+    end
+
+    local function aimAtTarget(camera, entry, dt)
+        local targetPosition = entry.part.Position
+        if Aim.Prediction > 0 then
+            targetPosition += entry.part.AssemblyLinearVelocity * Aim.Prediction
+        end
+
+        local cameraPosition = camera.CFrame.Position
+        if (targetPosition - cameraPosition).Magnitude < 0.05 then
+            return
+        end
+
+        local center = camera.ViewportSize / 2
+        local viewportPoint = camera:WorldToViewportPoint(targetPosition)
+        if viewportPoint.Z <= 0 then
+            return
+        end
+
+        local offset = (Vector2.new(viewportPoint.X, viewportPoint.Y) - center).Magnitude
+        if offset <= Aim.Deadzone then
+            return
+        end
+
+        local desired = CFrame.lookAt(cameraPosition, targetPosition)
+        local smoothness = Aim.Smoothness
+        local alpha
+        if smoothness <= 1 then
+            alpha = 1
+        else
+            -- Tương đương alpha = 1 / smoothness ở 60 FPS nhưng không phụ thuộc FPS.
+            local rate = -60 * math.log(1 - 1 / smoothness)
+            alpha = 1 - math.exp(-dt * rate)
+        end
+        alpha = math.clamp(alpha, 0, 1)
+
+        camera.CFrame = camera.CFrame:Lerp(desired, alpha)
+    end
+
+    local function updateAimCircle()
+        local circle = Aim.Circle
+        if not circle then
+            return
+        end
+
+        local camera = workspace.CurrentCamera
+        if not camera or not Aim.Enabled or not Aim.ShowCircle then
+            circle.Visible = false
+            return
+        end
+
+        circle.Position = camera.ViewportSize / 2
+        circle.Radius = Aim.FOV
+        circle.Color = Aim.Locked and Color3.fromRGB(90, 235, 150) or Color3.fromRGB(90, 200, 255)
+        circle.Visible = true
+    end
+
+    local function updateAimAssist(dt)
+        local camera = workspace.CurrentCamera
+        if not camera or not Aim.Enabled then
+            return
+        end
+
+        if Aim.ActivateMode ~= "ALWAYS" and not Aim.Holding then
+            Aim.Locked = false
+            Aim.CurrentModel = nil
+            return
+        end
+
+        -- Freecam đang điều khiển camera: không giành quyền xoay.
+        if camera.CameraType == Enum.CameraType.Scriptable then
+            Aim.Locked = false
+            return
+        end
+
+        local localCharacter = player.Character
+        local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
+        local origin = localRoot and localRoot.Position or camera.CFrame.Position
+        local center = camera.ViewportSize / 2
+
+        local count, biasScore = collectAimCandidates(camera, origin, center)
+
+        local chosen = nil
+        if count > 0 then
+            chosen = pickAimTarget(count, biasScore, camera)
+        end
+
+        if not chosen then
+            Aim.CurrentModel = nil
+            Aim.TargetName = ""
+            Aim.CurrentDistance = 0
+            Aim.Locked = false
+            return
+        end
+
+        Aim.CurrentModel = chosen.model
+        Aim.TargetName = chosen.model.Name
+        Aim.TargetKind = chosen.isPlayer and "PLAYER" or "NPC"
+        Aim.CurrentDistance = chosen.distance
+        Aim.Locked = true
+
+        aimAtTarget(camera, chosen, dt)
+    end
+
+    local AIM_RENDER_NAME = "VHT_AimAssist"
+    local aimBound = false
+    local aimStatusClock = 0
+
+    local function onAimRender(dt)
+        updateAimCircle()
+        updateAimAssist(dt)
+
+        aimStatusClock += dt
+        if aimStatusClock < 0.25 then
+            return
+        end
+        aimStatusClock = 0
+
+        if Aim.Locked then
+            setAimStatus(string.format("Đang ngắm: %s (%s) | %.0f studs",
+                Aim.TargetName, Aim.TargetKind, Aim.CurrentDistance))
+        elseif aimStatus and string.find(aimStatus.Text, "Đang ngắm", 1, true) then
+            setAimStatus("Giữ chuột phải để hỗ trợ ngắm.")
+        end
+    end
+
+    local function startAimLoop()
+        if aimBound then
+            return
+        end
+        RunService:BindToRenderStep(AIM_RENDER_NAME, Enum.RenderPriority.Camera.Value + 1, onAimRender)
+        aimBound = true
+    end
+
+    local function stopAimLoop()
+        if aimBound then
+            pcall(function()
+                RunService:UnbindFromRenderStep(AIM_RENDER_NAME)
+            end)
+            aimBound = false
+        end
+
+        Aim.Locked = false
+        Aim.CurrentModel = nil
+        Aim.TargetName = ""
+        Aim.TargetKind = ""
+        if Aim.Circle then
+            Aim.Circle.Visible = false
+        end
+    end
+
+    local function refreshAimButtons()
+        aimToggleBtn.Text = "AIM ASSIST: " .. (Aim.Enabled and "ON" or "OFF")
+        aimToggleBtn.BackgroundColor3 = Aim.Enabled and COLOR_FLY_ON or COLOR_NOCLIP_OFF
+
+        aimModeBtn.Text = "ĐỐI TƯỢNG: " .. AIM_MODE_TEXT[Aim.Mode]
+        aimActivationBtn.Text = "KÍCH HOẠT: " .. AIM_ACTIVATION_TEXT[Aim.ActivateMode]
+        aimKeyBtn.Text = "PHÍM BẬT/TẮT: " .. Aim.ToggleKey.Name
+            .. (Aim.Capturing and " (nhấn phím...)" or "")
+        aimKeyBtn.BackgroundColor3 = Aim.Capturing and COLOR_CLOSE or COLOR_TAB_OFF
+        aimPartBtn.Text = "ĐIỂM NGẮM: " .. AIM_PART_TEXT[Aim.TargetPart]
+        aimPriorityBtn.Text = "ƯU TIÊN: " .. AIM_PRIORITY_TEXT[Aim.Priority]
+
+        aimVisibilityBtn.Text = "KIỂM TRA VẬT CẢN: " .. (Aim.VisibilityCheck and "ON" or "OFF")
+        aimVisibilityBtn.BackgroundColor3 = Aim.VisibilityCheck and COLOR_FLY_ON or COLOR_NOCLIP_OFF
+        aimTeamBtn.Text = "BỎ QUA ĐỒNG ĐỘI: " .. (Aim.TeamCheck and "ON" or "OFF")
+        aimTeamBtn.BackgroundColor3 = Aim.TeamCheck and COLOR_FLY_ON or COLOR_NOCLIP_OFF
+        aimCircleBtn.Text = "VÒNG FOV: " .. (Aim.ShowCircle and "ON" or "OFF")
+        aimCircleBtn.BackgroundColor3 = Aim.ShowCircle and COLOR_FLY_ON or COLOR_NOCLIP_OFF
+    end
+
+    local function setAimEnabled(enabled)
+        Aim.Enabled = enabled == true
+
+        if Aim.Enabled then
+            rebuildAimTargets()
+            startAimLoop()
+            local modeText = Aim.ActivateMode == "HOLD"
+                and "Giữ chuột phải để ngắm."
+                or "Đang tự động ngắm mục tiêu."
+            local npcText = Aim.Mode == "PLAYERS" and "" or string.format("%d NPC | ", #Aim.NPCs)
+            setAimStatus("Aim Assist ON. " .. npcText .. modeText)
+        else
+            stopAimLoop()
+            Aim.Holding = false
+            setAimStatus("Aim Assist OFF.")
+        end
+
+        refreshAimButtons()
+    end
+
+    aimToggleBtn.Activated:Connect(function()
+        setAimEnabled(not Aim.Enabled)
+    end)
+
+    aimModeBtn.Activated:Connect(function()
+        Aim.Mode = cycleValue(AIM_MODES, Aim.Mode)
+        refreshAimButtons()
+        setAimStatus("Đối tượng ngắm: " .. AIM_MODE_TEXT[Aim.Mode])
+    end)
+
+    aimActivationBtn.Activated:Connect(function()
+        Aim.ActivateMode = cycleValue(AIM_ACTIVATIONS, Aim.ActivateMode)
+        Aim.Holding = false
+        refreshAimButtons()
+        setAimStatus(Aim.ActivateMode == "HOLD"
+            and "Kích hoạt: giữ chuột phải."
+            or "Kích hoạt: luôn bật khi Aim Assist ON.")
+    end)
+
+    aimPartBtn.Activated:Connect(function()
+        Aim.TargetPart = cycleValue(AIM_PARTS, Aim.TargetPart)
+        refreshAimButtons()
+        setAimStatus("Điểm ngắm: " .. AIM_PART_TEXT[Aim.TargetPart])
+    end)
+
+    aimPriorityBtn.Activated:Connect(function()
+        Aim.Priority = cycleValue(AIM_PRIORITIES, Aim.Priority)
+        refreshAimButtons()
+        setAimStatus("Ưu tiên mục tiêu: " .. AIM_PRIORITY_TEXT[Aim.Priority])
+    end)
+
+    aimVisibilityBtn.Activated:Connect(function()
+        Aim.VisibilityCheck = not Aim.VisibilityCheck
+        refreshAimButtons()
+        setAimStatus("Kiểm tra vật cản: " .. (Aim.VisibilityCheck and "ON" or "OFF"))
+    end)
+
+    aimTeamBtn.Activated:Connect(function()
+        Aim.TeamCheck = not Aim.TeamCheck
+        refreshAimButtons()
+        setAimStatus("Bỏ qua đồng đội: " .. (Aim.TeamCheck and "ON" or "OFF"))
+    end)
+
+    aimCircleBtn.Activated:Connect(function()
+        Aim.ShowCircle = not Aim.ShowCircle
+        refreshAimButtons()
+        setAimStatus("Vòng FOV: " .. (Aim.ShowCircle and "ON" or "OFF"))
+    end)
+
+    aimKeyBtn.Activated:Connect(function()
+        Aim.Capturing = true
+        refreshAimButtons()
+        setAimStatus("Nhấn một phím để bật/tắt Aim Assist. ESC để hủy.")
+    end)
+
+    UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            if not UserInputService:GetFocusedTextBox() then
+                Aim.Holding = true
+            end
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            Aim.Holding = false
+        end
+    end)
+
+    function Aim.applyConfig(data)
+        if type(data) ~= "table" then
+            return
+        end
+
+        if type(data.aimMode) == "string" and AIM_MODE_TEXT[data.aimMode] then
+            Aim.Mode = data.aimMode
+        end
+
+        if type(data.aimTargetPart) == "string" then
+            -- Tương thích cấu hình cũ ("Head" / "Torso").
+            local legacyPart = string.upper(data.aimTargetPart)
+            if AIM_PART_TEXT[legacyPart] then
+                Aim.TargetPart = legacyPart
+            end
+        end
+
+        if type(data.aimPriority) == "string" and AIM_PRIORITY_TEXT[data.aimPriority] then
+            Aim.Priority = data.aimPriority
+        end
+
+        if type(data.aimActivateMode) == "string" and AIM_ACTIVATION_TEXT[data.aimActivateMode] then
+            Aim.ActivateMode = data.aimActivateMode
+        end
+
+        if type(data.aimToggleKey) == "string" and Enum.KeyCode[data.aimToggleKey] then
+            Aim.ToggleKey = Enum.KeyCode[data.aimToggleKey]
+        end
+
+        if type(data.aimVisibilityCheck) == "boolean" then
+            Aim.VisibilityCheck = data.aimVisibilityCheck
+        end
+        if type(data.aimTeamCheck) == "boolean" then
+            Aim.TeamCheck = data.aimTeamCheck
+        end
+        if type(data.aimShowCircle) == "boolean" then
+            Aim.ShowCircle = data.aimShowCircle
+        end
+
+        local function clampInteger(value, minValue, maxValue, fallback)
+            local number = tonumber(value)
+            if not number then
+                return fallback
+            end
+            return math.floor(math.clamp(number, minValue, maxValue) + 0.5)
+        end
+
+        Aim.FOV = clampInteger(data.aimFOV, 20, 800, Aim.FOV)
+        Aim.Smoothness = clampInteger(data.aimSmoothness, 1, 30, Aim.Smoothness)
+        Aim.MaxDistance = clampInteger(data.aimMaxDistance, 10, 5000, Aim.MaxDistance)
+        Aim.MinDistance = clampInteger(data.aimMinDistance, 0, 500, Aim.MinDistance)
+        Aim.Deadzone = clampInteger(data.aimDeadzone, 0, 100, Aim.Deadzone)
+
+        if type(data.aimPrediction) == "number" then
+            Aim.Prediction = math.clamp(data.aimPrediction, 0, 1)
+        end
+
+        for _, spec in ipairs(aimNumbers) do
+            spec.box.Text = formatAimNumber(spec, Aim[spec.key])
+        end
+
+        refreshAimButtons()
+
+        if data.aimEnabled == true then
+            setAimEnabled(true)
+        end
+    end
+
+    function Aim.destroy()
+        setAimEnabled(false)
+        if Aim.Circle then
+            pcall(function()
+                Aim.Circle:Remove()
+            end)
+            Aim.Circle = nil
+        end
+    end
+
+    Aim.setEnabled = setAimEnabled
+    Aim.refreshButtons = refreshAimButtons
+    Aim.setStatus = setAimStatus
+    Aim.Page = aimPage
+
+    refreshAimButtons()
+
+    task.spawn(function()
+        while gui.Parent do
+            if Aim.Enabled then
+                pcall(rebuildAimTargets)
+            end
+            task.wait(1)
+        end
+    end)
+
+end
 
 local teleportPage = Instance.new("Frame")
 teleportPage.Name = "TeleportPage"
@@ -1958,6 +2806,7 @@ local function showTab(tabName)
     teleportPage.Visible = tabName == "TELEPORT"
     speedPage.Visible = tabName == "SPEED"
     ZM.page.Visible = tabName == "ZOOM"
+    Aim.Page.Visible = tabName == "AIM"
     SET.page.Visible = tabName == "SETTING"
 
     flyTab.BackgroundColor3 = tabName == "FLY" and COLOR_TAB_ON or COLOR_TAB_OFF
@@ -1966,6 +2815,7 @@ local function showTab(tabName)
     teleportTab.BackgroundColor3 = tabName == "TELEPORT" and COLOR_TAB_ON or COLOR_TAB_OFF
     speedTab.BackgroundColor3 = tabName == "SPEED" and COLOR_TAB_ON or COLOR_TAB_OFF
     ZM.tab.BackgroundColor3 = tabName == "ZOOM" and COLOR_TAB_ON or COLOR_TAB_OFF
+    aimTab.BackgroundColor3 = tabName == "AIM" and COLOR_TAB_ON or COLOR_TAB_OFF
     SET.tab.BackgroundColor3 = tabName == "SETTING" and COLOR_TAB_ON or COLOR_TAB_OFF
 
     if tabName == "SERVER" and not serverLoaded then
@@ -1984,6 +2834,7 @@ espTab.Activated:Connect(function() showTab("ESP") end)
 teleportTab.Activated:Connect(function() showTab("TELEPORT") end)
 speedTab.Activated:Connect(function() showTab("SPEED") end)
 ZM.tab.Activated:Connect(function() showTab("ZOOM") end)
+aimTab.Activated:Connect(function() showTab("AIM") end)
 SET.tab.Activated:Connect(function() showTab("SETTING") end)
 refreshBtn.Activated:Connect(loadServers)
 minimizeBtn.Activated:Connect(minimizeWindow)
@@ -2013,6 +2864,23 @@ UserInputService.InputBegan:Connect(function(input, processed)
             SET.setStatus("Phím này đang dùng cho chức năng khác. Hãy chọn phím khác.")
         end
         SET.refresh()
+        return
+    end
+
+    if Aim.Capturing and input.UserInputType == Enum.UserInputType.Keyboard then
+        Aim.Capturing = false
+        if input.KeyCode == Enum.KeyCode.Escape then
+            Aim.setStatus("Đã hủy gán phím Aim Assist.")
+        elseif input.KeyCode ~= Enum.KeyCode.Unknown
+            and not SET.reserved[input.KeyCode]
+            and input.KeyCode ~= FC.key
+            and input.KeyCode ~= SET.windowKey then
+            Aim.ToggleKey = input.KeyCode
+            Aim.setStatus("Đã gán phím " .. Aim.ToggleKey.Name .. " để bật/tắt Aim Assist.")
+        else
+            Aim.setStatus("Phím này đang dùng cho chức năng khác. Hãy chọn phím khác.")
+        end
+        Aim.refreshButtons()
         return
     end
 
@@ -2066,6 +2934,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
     elseif input.KeyCode == Enum.KeyCode.G then
         setESPEnabled(not ESP.Enabled)
         refreshESPButtons()
+    elseif input.KeyCode == Aim.ToggleKey then
+        Aim.setEnabled(not Aim.Enabled)
     elseif input.KeyCode == SET.windowKey then
         toggleWindow()
     end
@@ -2079,6 +2949,7 @@ closeBtn.Activated:Connect(function()
 
     setNoclip(false)
     ESP.Destroy()
+    Aim.destroy()
     stopSpeedMode(true)
 
     if windowOpen then
@@ -2132,6 +3003,21 @@ function SET.build()
         freecamSpeed = FC.speedBox.Text,
         firstPerson = ZM.firstPerson,
         maxZoom = ZM.customMax,
+        aimEnabled = Aim.Enabled,
+        aimMode = Aim.Mode,
+        aimFOV = Aim.FOV,
+        aimSmoothness = Aim.Smoothness,
+        aimMaxDistance = Aim.MaxDistance,
+        aimMinDistance = Aim.MinDistance,
+        aimPrediction = Aim.Prediction,
+        aimDeadzone = Aim.Deadzone,
+        aimTargetPart = Aim.TargetPart,
+        aimPriority = Aim.Priority,
+        aimVisibilityCheck = Aim.VisibilityCheck,
+        aimTeamCheck = Aim.TeamCheck,
+        aimShowCircle = Aim.ShowCircle,
+        aimActivateMode = Aim.ActivateMode,
+        aimToggleKey = Aim.ToggleKey.Name,
     }
 end
 
@@ -2181,6 +3067,8 @@ function SET.load()
         setESPEnabled(true)
         refreshESPButtons()
     end
+    Aim.applyConfig(data)
+
     if data.firstPerson == true then
         ZM.firstPerson = true
         player.CameraMinZoomDistance = 0.5
