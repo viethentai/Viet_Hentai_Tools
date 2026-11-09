@@ -1,22 +1,3 @@
---[[
-    VIỆT HENTAI TOOLS - Fly + NoClip + Server Finder + ESP
-    LocalScript for Roblox Studio / executor.
-
-    Phím tắt:
-      F              - Bật/tắt bay
-      N              - Bật/tắt NoClip
-      G              - Bật/tắt ESP
-      RightShift     - Ẩn/hiện cửa sổ
-      WASD           - Di chuyển
-      E / Up arrow   - Bay lên (khi đứng gần vật tương tác, E ưu tiên tương tác)
-      Q / Down arrow - Bay xuống
-      + / -          - Đổi mốc tốc độ (giữ để lặp lại)
-
-    Icon nút thu gọn:
-      Đặt BUBBLE_IMAGE_ID = "rbxassetid://<ID>" để dùng ảnh.
-      Để trống "" thì nút hiển thị chữ "VH".
-]]
-
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -29,23 +10,18 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- HTTP request function của executor (nếu có)
 local requestFunc = (syn and syn.request)
     or (http and http.request)
     or http_request
     or (fluxus and fluxus.request)
     or request
 
----------------------------------------------------------------------
--- Constants & state
----------------------------------------------------------------------
 local MIN_LEVEL = 1
 local MAX_LEVEL = 30
 local speedLevel = 1
 local BASE_SPEED = 16
 local VERTICAL_SPEED = 16
 
--- Mỗi mốc gấp 1.5 lần mốc trước: mốc n = 1.5^(n-1) lần tốc độ gốc
 local function getSpeedMultiplier(level)
     return 1.5 ^ (level - 1)
 end
@@ -102,19 +78,16 @@ local oldPlatformStand
 local renderConnection
 
 local noclipConnection
-local noclipChanged = {} -- [BasePart] = true, parts whose CanCollide we turned off
+local noclipChanged = {}
 
 local serverLoaded = false
 local serverLoading = false
 local gameName = "Unknown"
 
 local maxDisplay = DEFAULT_DISPLAY
-local sortAscending = true -- true: ít -> nhiều, false: nhiều -> ít
-local cachedServers = {}   -- danh sách server còn chỗ, lấy từ lần tải gần nhất
+local sortAscending = true
+local cachedServers = {}
 
----------------------------------------------------------------------
--- Cleanup old copies & notify
----------------------------------------------------------------------
 for _, name in ipairs({ "FlyV4_HTZ", "LowServerFinder", "HTZ_Hub", "VietHentaiTools" }) do
     local old = playerGui:FindFirstChild(name)
     if old then
@@ -146,9 +119,6 @@ task.spawn(function()
     end)
 end)
 
----------------------------------------------------------------------
--- UI helpers
----------------------------------------------------------------------
 local function makeCorner(parent, radius)
     local corner = Instance.new("UICorner")
     corner.CornerRadius = radius
@@ -189,8 +159,6 @@ local function makeLabel(parent, name, text, position, size, textSize)
     return label
 end
 
--- Nút thu gọn: kéo thả được, và chỉ mở cửa sổ khi là một cú nhấp thật sự
--- (không mở khi thả chuột sau khi kéo).
 local DRAG_THRESHOLD = 5
 
 local function setupBubble(bubbleBtn, onClick)
@@ -242,9 +210,6 @@ local function setupBubble(bubbleBtn, onClick)
     end)
 end
 
----------------------------------------------------------------------
--- Main GUI
----------------------------------------------------------------------
 local gui = Instance.new("ScreenGui")
 gui.Name = "VietHentaiTools"
 gui.ResetOnSpawn = false
@@ -268,25 +233,40 @@ mainStroke.Color = COLOR_STROKE
 mainStroke.Thickness = 1.5
 mainStroke.Parent = main
 
--- Header
 local title = makeLabel(main, "Title", "Việt Hentai Tools", UDim2.fromOffset(12, 8), UDim2.fromOffset(420, 26), 18)
 
 local minimizeBtn = makeButton(main, "Minimize", "-", UDim2.fromOffset(448, 8), UDim2.fromOffset(30, 26), COLOR_MIN, 16)
 local closeBtn = makeButton(main, "Close", "X", UDim2.fromOffset(482, 8), UDim2.fromOffset(30, 26), COLOR_CLOSE)
 
--- Tabs
-local flyTab = makeButton(main, "TabFly", "FLY", UDim2.fromOffset(12, 44), UDim2.fromOffset(96, 30), COLOR_TAB_OFF, 12)
-local serverTab = makeButton(main, "TabServer", "SERVER", UDim2.fromOffset(112, 44), UDim2.fromOffset(96, 30), COLOR_TAB_OFF, 12)
-local espTab = makeButton(main, "TabESP", "ESP", UDim2.fromOffset(212, 44), UDim2.fromOffset(96, 30), COLOR_TAB_OFF, 12)
-local teleportTab = makeButton(main, "TabTeleport", "TELEPORT", UDim2.fromOffset(312, 44), UDim2.fromOffset(96, 30), COLOR_TAB_OFF, 11)
-local speedTab = makeButton(main, "TabSpeed", "SPEED", UDim2.fromOffset(412, 44), UDim2.fromOffset(96, 30), COLOR_TAB_OFF, 12)
-for _, tab in ipairs({ flyTab, serverTab, espTab, teleportTab, speedTab }) do
+local SET = {
+    windowKey = Enum.KeyCode.RightShift,
+    capturing = false,
+    file = "VHT_Settings.json",
+    reserved = {
+        [Enum.KeyCode.W] = true, [Enum.KeyCode.A] = true, [Enum.KeyCode.S] = true,
+        [Enum.KeyCode.D] = true, [Enum.KeyCode.E] = true, [Enum.KeyCode.Q] = true,
+        [Enum.KeyCode.F] = true, [Enum.KeyCode.N] = true, [Enum.KeyCode.G] = true,
+        [Enum.KeyCode.Escape] = true,
+    },
+}
+
+local ZM = {}
+ZM.customMax = nil
+ZM.originalMax = player.CameraMaxZoomDistance
+ZM.originalMin = player.CameraMinZoomDistance
+ZM.firstPerson = false
+
+local flyTab = makeButton(main, "TabFly", "FLY", UDim2.fromOffset(12, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
+local serverTab = makeButton(main, "TabServer", "SERVER", UDim2.fromOffset(84, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
+local espTab = makeButton(main, "TabESP", "ESP", UDim2.fromOffset(156, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
+local teleportTab = makeButton(main, "TabTeleport", "TELEPORT", UDim2.fromOffset(228, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
+local speedTab = makeButton(main, "TabSpeed", "SPEED", UDim2.fromOffset(300, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
+ZM.tab = makeButton(main, "TabZoom", "ZOOM", UDim2.fromOffset(372, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
+SET.tab = makeButton(main, "TabSetting", "SETTING", UDim2.fromOffset(444, 44), UDim2.fromOffset(68, 30), COLOR_TAB_OFF, 10)
+for _, tab in ipairs({ flyTab, serverTab, espTab, teleportTab, speedTab, ZM.tab, SET.tab }) do
     tab.TextColor3 = COLOR_TEXT
 end
 
----------------------------------------------------------------------
--- FLY page
----------------------------------------------------------------------
 local flyPage = Instance.new("Frame")
 flyPage.Name = "FlyPage"
 flyPage.Position = UDim2.fromOffset(0, 84)
@@ -327,9 +307,6 @@ hint.Font = Enum.Font.Gotham
 hint.TextColor3 = COLOR_HINT
 hint.TextXAlignment = Enum.TextXAlignment.Center
 
----------------------------------------------------------------------
--- SERVER page
----------------------------------------------------------------------
 local serverPage = Instance.new("Frame")
 serverPage.Name = "ServerPage"
 serverPage.Position = UDim2.fromOffset(0, 84)
@@ -345,7 +322,6 @@ serverStatus.Font = Enum.Font.Gotham
 local refreshBtn = makeButton(serverPage, "Refresh", "LÀM MỚI",
     UDim2.fromOffset(380, 6), UDim2.fromOffset(128, 26), COLOR_PLUS, 12)
 
--- Hàng điều khiển: số server hiển thị + kiểu sắp xếp
 local maxBox = Instance.new("TextBox")
 maxBox.Name = "MaxBox"
 maxBox.Position = UDim2.fromOffset(12, 40)
@@ -388,9 +364,6 @@ listPadding.PaddingRight = UDim.new(0, 6)
 listPadding.PaddingBottom = UDim.new(0, 6)
 listPadding.Parent = serverList
 
----------------------------------------------------------------------
--- Bubble (nút tròn, hiện khi thu gọn)
----------------------------------------------------------------------
 local bubble = Instance.new("TextButton")
 bubble.Name = "Bubble"
 bubble.Position = UDim2.fromOffset(10, 200)
@@ -405,17 +378,13 @@ bubble.TextSize = 16
 bubble.ClipsDescendants = true
 bubble.Visible = false
 bubble.Parent = gui
-makeCorner(bubble, UDim.new(0.5, 0)) -- bo tròn thành hình tròn
+makeCorner(bubble, UDim.new(0.5, 0))
 
 bubble.Text = "🐱"
 bubble.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 bubble.BackgroundTransparency = 0
 bubble.TextSize = 24
 
----------------------------------------------------------------------
--- Window minimize / restore animation
--- Thu nhỏ từ từ vào đúng vị trí nút tròn, và phóng ra từ nút tròn.
----------------------------------------------------------------------
 local windowOpen = true
 local windowBusy = false
 local openPosition = main.Position
@@ -479,9 +448,6 @@ end
 
 setupBubble(bubble, openWindow)
 
----------------------------------------------------------------------
--- ESP (Drawing API)
----------------------------------------------------------------------
 local ESP = {
     Enabled = false,
     Boxes = true,
@@ -587,7 +553,6 @@ local function updateESPPlayer(targetPlayer, obj, camera, localRoot)
     local boxPos = Vector2.new(centerX - width / 2, headTop.Y)
     local boxSize = Vector2.new(width, height)
 
-    -- Hộp
     obj.Outline.Visible = ESP.Boxes
     obj.Box.Visible = ESP.Boxes
     if ESP.Boxes then
@@ -598,7 +563,6 @@ local function updateESPPlayer(targetPlayer, obj, camera, localRoot)
         obj.Box.Color = color
     end
 
-    -- Tên + khoảng cách
     local labelParts = {}
     if ESP.Names then
         table.insert(labelParts, targetPlayer.DisplayName)
@@ -614,7 +578,6 @@ local function updateESPPlayer(targetPlayer, obj, camera, localRoot)
         obj.Name.Position = Vector2.new(centerX, boxPos.Y - 16)
     end
 
-    -- Thanh máu (bên trái hộp, đỏ -> xanh)
     obj.HpBack.Visible = ESP.Health
     obj.HpFill.Visible = ESP.Health
     if ESP.Health then
@@ -627,7 +590,6 @@ local function updateESPPlayer(targetPlayer, obj, camera, localRoot)
         obj.HpFill.Color = Color3.fromHSV(ratio * 0.33, 1, 1)
     end
 
-    -- Tracer (từ đáy màn hình tới chân người chơi)
     obj.Tracer.Visible = ESP.Tracers
     if ESP.Tracers then
         local vp = camera.ViewportSize
@@ -680,9 +642,6 @@ end
 
 Players.PlayerRemoving:Connect(removeESP)
 
----------------------------------------------------------------------
--- ESP tab UI
----------------------------------------------------------------------
 local espPage = Instance.new("Frame")
 espPage.Name = "ESPPage"
 espPage.Position = UDim2.fromOffset(0, 84)
@@ -741,9 +700,6 @@ end
 
 refreshESPButtons()
 
----------------------------------------------------------------------
--- TELEPORT tab: save / load / teleport to local positions
----------------------------------------------------------------------
 local teleportPage = Instance.new("Frame")
 teleportPage.Name = "TeleportPage"
 teleportPage.Position = UDim2.fromOffset(0, 84)
@@ -770,15 +726,38 @@ makeCorner(pointNameBox, UDim.new(0, 7))
 local savePointBtn = makeButton(teleportPage, "SavePoint", "LƯU VỊ TRÍ",
     UDim2.fromOffset(352, 10), UDim2.fromOffset(156, 34), COLOR_PLUS, 12)
 
-local teleportStatus = makeLabel(teleportPage, "TeleportStatus", "Đang tải điểm đã lưu...",
-    UDim2.fromOffset(12, 50), UDim2.fromOffset(496, 22), 11)
+local FC = {}
+
+FC.toggleBtn = makeButton(teleportPage, "FreecamToggle", "FREE CAM: OFF",
+    UDim2.fromOffset(12, 50), UDim2.fromOffset(244, 34), COLOR_NOCLIP_OFF, 12)
+FC.speedBox = Instance.new("TextBox")
+FC.speedBox.Name = "FreecamSpeedBox"
+FC.speedBox.Position = UDim2.fromOffset(264, 50)
+FC.speedBox.Size = UDim2.fromOffset(244, 34)
+FC.speedBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+FC.speedBox.BorderSizePixel = 0
+FC.speedBox.Font = Enum.Font.GothamBold
+FC.speedBox.Text = "64"
+FC.speedBox.PlaceholderText = "Tốc độ free cam"
+FC.speedBox.ClearTextOnFocus = false
+FC.speedBox.TextColor3 = Color3.fromRGB(25, 30, 35)
+FC.speedBox.TextSize = 13
+FC.speedBox.Parent = teleportPage
+makeCorner(FC.speedBox, UDim.new(0, 7))
+
+FC.keybindBtn = makeButton(teleportPage, "FreecamKeybind", "PHÍM FREE CAM: P",
+    UDim2.fromOffset(12, 88), UDim2.fromOffset(196, 26), COLOR_TAB_OFF, 10)
+
+local teleportStatus = makeLabel(teleportPage, "TeleportStatus", "WASD di chuyển | E lên | Q xuống | Chuột xoay",
+    UDim2.fromOffset(216, 88), UDim2.fromOffset(292, 26), 9)
 teleportStatus.Font = Enum.Font.Gotham
 teleportStatus.TextColor3 = COLOR_HINT
+teleportStatus.TextWrapped = true
 
 local pointList = Instance.new("ScrollingFrame")
 pointList.Name = "PointList"
-pointList.Position = UDim2.fromOffset(12, 78)
-pointList.Size = UDim2.fromOffset(496, 220)
+pointList.Position = UDim2.fromOffset(12, 122)
+pointList.Size = UDim2.fromOffset(496, 176)
 pointList.BackgroundColor3 = COLOR_LIST
 pointList.BorderSizePixel = 0
 pointList.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -972,9 +951,6 @@ end)
 loadPoints()
 renderSavedPoints()
 
----------------------------------------------------------------------
--- SPEED tab: numeric WalkSpeed + mutually-exclusive application methods
----------------------------------------------------------------------
 local speedPage = Instance.new("Frame")
 speedPage.Name = "SpeedPage"
 speedPage.Position = UDim2.fromOffset(0, 84)
@@ -988,7 +964,7 @@ makeLabel(speedPage, "SpeedTitle", "TỐC ĐỘ DI CHUYỂN", UDim2.fromOffset(1
 
 local walkSpeedBox = Instance.new("TextBox")
 walkSpeedBox.Name = "WalkSpeedBox"
-walkSpeedBox.Position = UDim2.fromOffset(12, 48)
+walkSpeedBox.Position = UDim2.fromOffset(12, 42)
 walkSpeedBox.Size = UDim2.fromOffset(330, 38)
 walkSpeedBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
 walkSpeedBox.BorderSizePixel = 0
@@ -1002,19 +978,19 @@ walkSpeedBox.Parent = speedPage
 makeCorner(walkSpeedBox, UDim.new(0, 7))
 
 local applySpeedBtn = makeButton(speedPage, "ApplyWalkSpeed", "ÁP DỤNG",
-    UDim2.fromOffset(352, 48), UDim2.fromOffset(156, 38), COLOR_PLUS, 13)
+    UDim2.fromOffset(352, 42), UDim2.fromOffset(156, 38), COLOR_PLUS, 13)
 
 local speedModeLabel = makeLabel(speedPage, "SpeedModeLabel", "PHƯƠNG PHÁP ÁP DỤNG (CHỌN 1)",
-    UDim2.fromOffset(12, 102), UDim2.fromOffset(496, 22), 12)
+    UDim2.fromOffset(12, 90), UDim2.fromOffset(496, 22), 12)
 speedModeLabel.TextColor3 = COLOR_HINT
 
 local directSpeedBtn = makeButton(speedPage, "SpeedModeDirect", "CÁCH 1: ĐẶT WALKSpeed",
-    UDim2.fromOffset(12, 132), UDim2.fromOffset(244, 44), COLOR_NOCLIP_OFF, 12)
+    UDim2.fromOffset(12, 118), UDim2.fromOffset(244, 40), COLOR_NOCLIP_OFF, 12)
 local loopSpeedBtn = makeButton(speedPage, "SpeedModeLoop", "CÁCH 2: GIỮ WALKSpeed",
-    UDim2.fromOffset(264, 132), UDim2.fromOffset(244, 44), COLOR_NOCLIP_OFF, 12)
+    UDim2.fromOffset(264, 118), UDim2.fromOffset(244, 40), COLOR_NOCLIP_OFF, 12)
 
 local speedStatus = makeLabel(speedPage, "SpeedStatus", "Nhập tốc độ rồi nhấn ÁP DỤNG.",
-    UDim2.fromOffset(12, 190), UDim2.fromOffset(496, 34), 12)
+    UDim2.fromOffset(12, 170), UDim2.fromOffset(496, 50), 11)
 speedStatus.Font = Enum.Font.Gotham
 speedStatus.TextColor3 = COLOR_HINT
 speedStatus.TextWrapped = true
@@ -1022,7 +998,7 @@ speedStatus.TextWrapped = true
 local SPEED_MIN = 0.1
 local SPEED_MAX = 500
 local requestedWalkSpeed = 32
-local speedMode = nil -- nil / "direct" / "loop"
+local speedMode = nil
 local speedConnection = nil
 local originalWalkSpeed = nil
 local speedTargetHumanoid = nil
@@ -1161,9 +1137,6 @@ loopSpeedBtn.Activated:Connect(function()
 end)
 updateSpeedModeButtons()
 
----------------------------------------------------------------------
--- Visual state helpers (FLY / NOCLIP)
----------------------------------------------------------------------
 local function refreshToggles()
     if flying then
         toggle.Text = "FLY: ON"
@@ -1184,9 +1157,6 @@ end
 
 refreshToggles()
 
----------------------------------------------------------------------
--- Speed controls (mốc 1-30, hold-to-repeat, mouse & touch)
----------------------------------------------------------------------
 local function updateCountBox()
     countBox.Text = formatSpeed(speedLevel)
 end
@@ -1201,7 +1171,6 @@ local function changeSpeed(amount)
     setSpeed(speedLevel + amount)
 end
 
--- Khi bấm vào ô: hiện số mốc để gõ trực tiếp
 countBox.Focused:Connect(function()
     countBox.Text = tostring(speedLevel)
 end)
@@ -1243,18 +1212,12 @@ end
 bindHold(plus, 1)
 bindHold(minus, -1)
 
----------------------------------------------------------------------
--- Character helpers
----------------------------------------------------------------------
 local function getCharacter()
     character = player.Character or player.CharacterAdded:Wait()
     humanoid = character:WaitForChild("Humanoid")
     root = character:WaitForChild("HumanoidRootPart")
 end
 
----------------------------------------------------------------------
--- NoClip
----------------------------------------------------------------------
 local function restoreCollisions()
     for part, wasCollidable in pairs(noclipChanged) do
         if part and part.Parent then
@@ -1306,15 +1269,11 @@ local function toggleNoclip()
     setNoclip(not noclip)
 end
 
----------------------------------------------------------------------
--- Flight
----------------------------------------------------------------------
 local stopFlight
 
 local promptParams = OverlapParams.new()
 promptParams.FilterType = Enum.RaycastFilterType.Exclude
 
--- Kiểm tra có ProximityPrompt (vật cần tương tác bằng E) gần nhân vật không.
 local function hasInteractableNearby(rootPart)
     promptParams.FilterDescendantsInstances = character and { character } or {}
 
@@ -1377,6 +1336,178 @@ stopFlight = function()
     end
 end
 
+FC.enabled = false
+FC.connection = nil
+FC.camera = nil
+FC.position = nil
+FC.yaw, FC.pitch = 0, 0
+FC.minSpeed, FC.maxSpeed = 1, 500
+FC.key = Enum.KeyCode.R
+FC.capturing = false
+
+function FC.refreshKeybind()
+    FC.keybindBtn.Text = "PHÍM FREE CAM: " .. FC.key.Name
+end
+
+FC.lock = { root = nil, anchored = false, controls = nil }
+
+function FC.setLocked(locked)
+    if locked then
+        local character = player.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        if root then
+            FC.lock.root = root
+            FC.lock.anchored = root.Anchored
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.Anchored = true
+        end
+        pcall(function()
+            local playerScripts = player:FindFirstChild("PlayerScripts")
+            local playerModule = playerScripts and playerScripts:FindFirstChild("PlayerModule")
+            if playerModule then
+                FC.lock.controls = require(playerModule):GetControls()
+                FC.lock.controls:Disable()
+            end
+        end)
+    else
+        if FC.lock.root and FC.lock.root.Parent then
+            FC.lock.root.Anchored = FC.lock.anchored
+        end
+        FC.lock.root = nil
+        if FC.lock.controls then
+            pcall(function() FC.lock.controls:Enable() end)
+            FC.lock.controls = nil
+        end
+    end
+end
+
+local function stopFreecam(teleportToCamera)
+    if not FC.enabled then return end
+    FC.enabled = false
+    if FC.connection then
+        FC.connection:Disconnect()
+        FC.connection = nil
+    end
+
+    local destination = FC.position
+    local facing = CFrame.fromOrientation(FC.pitch, FC.yaw, 0).LookVector
+    local camera = workspace.CurrentCamera
+    if camera then
+        camera.CameraType = FC.oldType or Enum.CameraType.Custom
+        local currentCharacter = player.Character
+        local currentHumanoid = currentCharacter and currentCharacter:FindFirstChildOfClass("Humanoid")
+        camera.CameraSubject = FC.oldSubject and FC.oldSubject.Parent and FC.oldSubject
+            or currentHumanoid
+        if FC.oldCFrame then camera.CFrame = FC.oldCFrame end
+        if FC.oldFov then camera.FieldOfView = FC.oldFov end
+    end
+    FC.setLocked(false)
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    UserInputService.MouseIconEnabled = true
+
+    if teleportToCamera and destination then
+        local currentCharacter = player.Character
+        local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+        if currentRoot then
+            local look = Vector3.new(facing.X, 0, facing.Z)
+            if look.Magnitude < 0.001 then
+                look = Vector3.new(0, 0, -1)
+            else
+                look = look.Unit
+            end
+            pcall(function()
+                currentRoot.AssemblyLinearVelocity = Vector3.zero
+                currentRoot.CFrame = CFrame.lookAt(destination, destination + look)
+            end)
+            setTeleportStatus("Đã tắt Free Cam và đưa nhân vật tới vị trí camera.")
+        else
+            setTeleportStatus("Đã tắt Free Cam nhưng không tìm thấy nhân vật để dịch chuyển.")
+        end
+    else
+        setTeleportStatus("Free Cam đã tắt.")
+    end
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    UserInputService.MouseIconEnabled = true
+    FC.toggleBtn.Text = "FREE CAM: OFF"
+    FC.toggleBtn.BackgroundColor3 = COLOR_NOCLIP_OFF
+end
+
+local function startFreecam()
+    local currentCharacter = player.Character
+    local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+    if not currentRoot then
+        setTeleportStatus("Chưa tìm thấy nhân vật để bật Free Cam.")
+        return
+    end
+    if flying and stopFlight then stopFlight() end
+
+    local camera = workspace.CurrentCamera
+    if not camera then
+        setTeleportStatus("Không tìm thấy camera hiện tại.")
+        return
+    end
+
+    FC.enabled = true
+    FC.camera = camera
+    FC.oldType = camera.CameraType
+    FC.oldSubject = camera.CameraSubject
+    FC.oldCFrame = camera.CFrame
+    FC.oldFov = camera.FieldOfView
+    FC.oldMouseBehavior = UserInputService.MouseBehavior
+    FC.oldMouseIcon = UserInputService.MouseIconEnabled
+    FC.position = camera.CFrame.Position
+    local look = camera.CFrame.LookVector
+    FC.yaw = math.atan2(-look.X, -look.Z)
+    FC.pitch = math.asin(math.clamp(look.Y, -1, 1))
+    camera.CameraType = Enum.CameraType.Scriptable
+    FC.setLocked(true)
+    UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
+    UserInputService.MouseIconEnabled = false
+    FC.toggleBtn.Text = "FREE CAM: ON"
+    FC.toggleBtn.BackgroundColor3 = COLOR_FLY_ON
+    setTeleportStatus("Free Cam ON | WASD di chuyển, chuột xoay. ESC thoát không tele. Nhấn " .. FC.key.Name .. " để tắt và dịch chuyển.")
+
+    FC.connection = RunService.RenderStepped:Connect(function(dt)
+        if not FC.enabled then return end
+        local activeCamera = workspace.CurrentCamera
+        if not activeCamera then stopFreecam(false); return end
+
+        local delta = UserInputService:GetMouseDelta()
+        FC.yaw -= delta.X * 0.0025
+        FC.pitch = math.clamp(FC.pitch - delta.Y * 0.0025, math.rad(-89), math.rad(89))
+        local rotation = CFrame.fromOrientation(FC.pitch, FC.yaw, 0)
+        local move = Vector3.zero
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += rotation.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= rotation.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += rotation.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= rotation.RightVector end
+        if move.Magnitude > 1 then move = move.Unit end
+
+        local speed = tonumber(FC.speedBox.Text) or 64
+        speed = math.clamp(speed, FC.minSpeed, FC.maxSpeed)
+        FC.position += move * speed * dt
+        activeCamera.CFrame = CFrame.new(FC.position) * rotation
+    end)
+end
+
+local function toggleFreecam()
+    if FC.enabled then
+        stopFreecam(true)
+    else
+        startFreecam()
+    end
+end
+
+FC.toggleBtn.Activated:Connect(toggleFreecam)
+
+FC.keybindBtn.Activated:Connect(function()
+    FC.capturing = true
+    FC.keybindBtn.Text = "NHẤN PHÍM MUỐN GÁN..."
+    setTeleportStatus("Nhấn một phím để gán bật/tắt Free Cam. ESC để hủy.")
+end)
+
+FC.refreshKeybind()
+
 local function startFlight()
     getCharacter()
     if not humanoid or not root or humanoid.Health <= 0 then
@@ -1428,8 +1559,6 @@ local function startFlight()
 
         local moveDirection = getKeyboardMove(camera)
 
-        -- E / Up: bay lên. Nếu đang đứng gần vật tương tác thì E dành cho tương tác.
-        -- Q / Down: bay xuống.
         local upHeld = UserInputService:IsKeyDown(Enum.KeyCode.E)
             or UserInputService:IsKeyDown(Enum.KeyCode.Up)
         local downHeld = UserInputService:IsKeyDown(Enum.KeyCode.Q)
@@ -1465,9 +1594,6 @@ local function toggleFlight()
     end
 end
 
----------------------------------------------------------------------
--- Server finder
----------------------------------------------------------------------
 local function setStatus(text)
     serverStatus.Text = text
 end
@@ -1533,9 +1659,7 @@ local function createServerEntry(server, order)
     end
 end
 
--- Vẽ lại danh sách từ cache theo số lượng và kiểu sắp xếp hiện tại.
--- Không gọi lại API nên đổi số lượng/sắp xếp thì tức thì.
-local loadServers -- khai báo trước, định nghĩa ở phần dưới
+local loadServers
 
 local function renderServers(list)
     local sorted = {}
@@ -1589,13 +1713,11 @@ local function setMaxDisplay(value)
     maxDisplay = value
     maxBox.Text = tostring(maxDisplay)
 
-    -- Đổi số lượng thì quét lại đúng bằng số đó
     if changed and serverLoaded and not serverLoading then
         loadServers()
     end
 end
 
--- Chọn kích thước trang nhỏ nhất đủ dùng, để mỗi lần gọi API tải ít dữ liệu hơn.
 local function getPageLimit(needed)
     if needed <= 10 then return 10 end
     if needed <= 25 then return 25 end
@@ -1603,7 +1725,6 @@ local function getPageLimit(needed)
     return 100
 end
 
--- Lấy một trang server. Tự thử lại khi bị giới hạn tốc độ (HTTP 429).
 local function fetchPage(cursor, limit)
     if not requestFunc then
         return nil, "Executor không hỗ trợ HTTP request"
@@ -1654,7 +1775,6 @@ loadServers = function()
     serverLoading = true
     serverLoaded = true
 
-    -- Quét đúng bằng số server người dùng muốn hiển thị
     local target = maxDisplay
     local limit = getPageLimit(target)
 
@@ -1688,7 +1808,6 @@ loadServers = function()
             pages += 1
             cursor = data.nextPageCursor
 
-            -- Hiển thị ngay khi có kết quả, không đợi quét xong
             renderServers(found)
             setStatus(string.format("Đang quét... %d / %d server", #found, target))
 
@@ -1698,7 +1817,7 @@ loadServers = function()
         until #found >= target or not cursor or pages >= MAX_SERVER_PAGES
 
         if errorMsg and #found == 0 then
-            -- Lỗi và chưa có kết quả nào: giữ nguyên danh sách cũ
+
             setStatus("Lỗi: " .. errorMsg .. " (giữ danh sách cũ)")
         else
             cachedServers = found
@@ -1710,21 +1829,144 @@ loadServers = function()
     end)
 end
 
----------------------------------------------------------------------
--- Tabs
----------------------------------------------------------------------
+ZM.page = Instance.new("Frame")
+ZM.page.Name = "ZoomPage"
+ZM.page.Position = UDim2.fromOffset(0, 84)
+ZM.page.Size = UDim2.fromOffset(520, 306)
+ZM.page.BackgroundTransparency = 1
+ZM.page.Visible = false
+ZM.page.Parent = main
+
+makeLabel(ZM.page, "ZoomTitle", "ZOOM CAMERA", UDim2.fromOffset(12, 12), UDim2.fromOffset(496, 24), 15)
+
+ZM.currentLabel = makeLabel(ZM.page, "ZoomCurrent", "", UDim2.fromOffset(12, 42), UDim2.fromOffset(496, 22), 13)
+ZM.currentLabel.TextColor3 = COLOR_HINT
+
+ZM.maxBox = Instance.new("TextBox")
+ZM.maxBox.Name = "ZoomMaxBox"
+ZM.maxBox.Position = UDim2.fromOffset(12, 72)
+ZM.maxBox.Size = UDim2.fromOffset(330, 38)
+ZM.maxBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+ZM.maxBox.BorderSizePixel = 0
+ZM.maxBox.Font = Enum.Font.GothamBold
+ZM.maxBox.Text = ""
+ZM.maxBox.PlaceholderText = "Nhập max zoom (ví dụ 400)"
+ZM.maxBox.ClearTextOnFocus = false
+ZM.maxBox.TextColor3 = Color3.fromRGB(25, 30, 35)
+ZM.maxBox.TextSize = 15
+ZM.maxBox.Parent = ZM.page
+makeCorner(ZM.maxBox, UDim.new(0, 7))
+
+ZM.applyBtn = makeButton(ZM.page, "ApplyMaxZoom", "ÁP DỤNG",
+    UDim2.fromOffset(352, 72), UDim2.fromOffset(156, 38), COLOR_PLUS, 13)
+
+ZM.resetBtn = makeButton(ZM.page, "ResetMaxZoom", "RESET MAX ZOOM",
+    UDim2.fromOffset(12, 122), UDim2.fromOffset(496, 34), COLOR_NOCLIP_OFF, 13)
+
+ZM.firstPersonBtn = makeButton(ZM.page, "UnlockFirstPerson", "",
+    UDim2.fromOffset(12, 168), UDim2.fromOffset(496, 34), COLOR_NOCLIP_OFF, 13)
+
+ZM.statusLabel = makeLabel(ZM.page, "ZoomStatus", "Nhập max zoom rồi nhấn ÁP DỤNG.",
+    UDim2.fromOffset(12, 214), UDim2.fromOffset(496, 50), 11)
+ZM.statusLabel.Font = Enum.Font.Gotham
+ZM.statusLabel.TextColor3 = COLOR_HINT
+ZM.statusLabel.TextWrapped = true
+
+function ZM.setStatus(message)
+    ZM.statusLabel.Text = message
+end
+
+function ZM.refresh()
+    ZM.currentLabel.Text = string.format("Max zoom: %s | Min zoom: %s",
+        tostring(player.CameraMaxZoomDistance), tostring(player.CameraMinZoomDistance))
+    ZM.maxBox.Text = tostring(player.CameraMaxZoomDistance)
+    ZM.firstPersonBtn.Text = ZM.firstPerson and "GÓC NHÌN THỨ NHẤT: ON" or "GÓC NHÌN THỨ NHẤT: OFF"
+    ZM.firstPersonBtn.BackgroundColor3 = ZM.firstPerson and COLOR_FLY_ON or COLOR_NOCLIP_OFF
+end
+
+ZM.applyBtn.Activated:Connect(function()
+    local number = tonumber(ZM.maxBox.Text)
+    if not number then
+        ZM.setStatus("Giá trị max zoom không hợp lệ.")
+        return
+    end
+    number = math.clamp(number, 0.5, 100000)
+    player.CameraMaxZoomDistance = number
+    ZM.customMax = number
+    ZM.setStatus("Đã đặt max zoom: " .. tostring(number))
+    ZM.refresh()
+end)
+
+ZM.resetBtn.Activated:Connect(function()
+    player.CameraMaxZoomDistance = ZM.originalMax
+    ZM.customMax = nil
+    ZM.setStatus("Đã khôi phục max zoom gốc: " .. tostring(ZM.originalMax))
+    ZM.refresh()
+end)
+
+ZM.firstPersonBtn.Activated:Connect(function()
+    ZM.firstPerson = not ZM.firstPerson
+    player.CameraMinZoomDistance = ZM.firstPerson and 0.5 or ZM.originalMin
+    ZM.setStatus(ZM.firstPerson
+        and "Đã mở khóa góc nhìn thứ nhất: kéo zoom về sát để vào góc nhìn thứ nhất."
+        or "Đã khôi phục min zoom gốc của game.")
+    ZM.refresh()
+end)
+
+ZM.refresh()
+
+SET.page = Instance.new("Frame")
+SET.page.Name = "SettingPage"
+SET.page.Position = UDim2.fromOffset(0, 84)
+SET.page.Size = UDim2.fromOffset(520, 306)
+SET.page.BackgroundTransparency = 1
+SET.page.Visible = false
+SET.page.Parent = main
+
+makeLabel(SET.page, "SettingTitle", "CÀI ĐẶT", UDim2.fromOffset(12, 12), UDim2.fromOffset(496, 24), 15)
+
+SET.windowKeyBtn = makeButton(SET.page, "WindowKeyBind", "",
+    UDim2.fromOffset(12, 42), UDim2.fromOffset(496, 34), COLOR_MINUS, 13)
+
+SET.themeBtn = makeButton(SET.page, "ThemeButton", "ĐỔI THEME: MẶC ĐỊNH",
+    UDim2.fromOffset(12, 86), UDim2.fromOffset(496, 34), COLOR_NOCLIP_OFF, 13)
+
+SET.saveBtn = makeButton(SET.page, "SaveConfig", "LƯU CẤU HÌNH",
+    UDim2.fromOffset(12, 130), UDim2.fromOffset(496, 34), COLOR_PLUS, 13)
+
+SET.statusLabel = makeLabel(SET.page, "SettingStatus", "Cấu hình đã lưu sẽ tự động tải khi mở script.",
+    UDim2.fromOffset(12, 174), UDim2.fromOffset(496, 50), 11)
+SET.statusLabel.Font = Enum.Font.Gotham
+SET.statusLabel.TextColor3 = COLOR_HINT
+SET.statusLabel.TextWrapped = true
+
+function SET.setStatus(message)
+    SET.statusLabel.Text = message
+end
+
+function SET.refresh()
+    SET.windowKeyBtn.Text = "PHÍM MỞ/ĐÓNG POPUP: " .. SET.windowKey.Name
+        .. (SET.capturing and "  (nhấn phím mới...)" or "")
+    SET.windowKeyBtn.BackgroundColor3 = SET.capturing and COLOR_CLOSE or COLOR_MINUS
+    hint.Text = "E: lên   Q: xuống   E gần vật: tương tác   " .. SET.windowKey.Name .. ": ẩn/hiện"
+end
+
 local function showTab(tabName)
     flyPage.Visible = tabName == "FLY"
     serverPage.Visible = tabName == "SERVER"
     espPage.Visible = tabName == "ESP"
     teleportPage.Visible = tabName == "TELEPORT"
     speedPage.Visible = tabName == "SPEED"
+    ZM.page.Visible = tabName == "ZOOM"
+    SET.page.Visible = tabName == "SETTING"
 
     flyTab.BackgroundColor3 = tabName == "FLY" and COLOR_TAB_ON or COLOR_TAB_OFF
     serverTab.BackgroundColor3 = tabName == "SERVER" and COLOR_TAB_ON or COLOR_TAB_OFF
     espTab.BackgroundColor3 = tabName == "ESP" and COLOR_TAB_ON or COLOR_TAB_OFF
     teleportTab.BackgroundColor3 = tabName == "TELEPORT" and COLOR_TAB_ON or COLOR_TAB_OFF
     speedTab.BackgroundColor3 = tabName == "SPEED" and COLOR_TAB_ON or COLOR_TAB_OFF
+    ZM.tab.BackgroundColor3 = tabName == "ZOOM" and COLOR_TAB_ON or COLOR_TAB_OFF
+    SET.tab.BackgroundColor3 = tabName == "SETTING" and COLOR_TAB_ON or COLOR_TAB_OFF
 
     if tabName == "SERVER" and not serverLoaded then
         loadServers()
@@ -1734,9 +1976,6 @@ end
 updateSortButton()
 showTab("FLY")
 
----------------------------------------------------------------------
--- Connections
----------------------------------------------------------------------
 toggle.Activated:Connect(toggleFlight)
 noclipButton.Activated:Connect(toggleNoclip)
 flyTab.Activated:Connect(function() showTab("FLY") end)
@@ -1744,6 +1983,8 @@ serverTab.Activated:Connect(function() showTab("SERVER") end)
 espTab.Activated:Connect(function() showTab("ESP") end)
 teleportTab.Activated:Connect(function() showTab("TELEPORT") end)
 speedTab.Activated:Connect(function() showTab("SPEED") end)
+ZM.tab.Activated:Connect(function() showTab("ZOOM") end)
+SET.tab.Activated:Connect(function() showTab("SETTING") end)
 refreshBtn.Activated:Connect(loadServers)
 minimizeBtn.Activated:Connect(minimizeWindow)
 
@@ -1760,27 +2001,82 @@ sortBtn.Activated:Connect(function()
 end)
 
 UserInputService.InputBegan:Connect(function(input, processed)
+
+    if SET.capturing and input.UserInputType == Enum.UserInputType.Keyboard then
+        SET.capturing = false
+        if input.KeyCode == Enum.KeyCode.Escape then
+            SET.setStatus("Đã hủy gán phím popup.")
+        elseif input.KeyCode ~= Enum.KeyCode.Unknown and not SET.reserved[input.KeyCode] and input.KeyCode ~= FC.key then
+            SET.windowKey = input.KeyCode
+            SET.setStatus("Đã gán phím popup: " .. SET.windowKey.Name)
+        else
+            SET.setStatus("Phím này đang dùng cho chức năng khác. Hãy chọn phím khác.")
+        end
+        SET.refresh()
+        return
+    end
+
+    if FC.capturing and input.UserInputType == Enum.UserInputType.Keyboard then
+        if input.KeyCode == Enum.KeyCode.Escape then
+            FC.capturing = false
+            FC.refreshKeybind()
+            setTeleportStatus("Đã hủy gán phím Free Cam.")
+            return
+        end
+
+        local reservedKeys = {
+            [Enum.KeyCode.W] = true,
+            [Enum.KeyCode.A] = true,
+            [Enum.KeyCode.S] = true,
+            [Enum.KeyCode.D] = true,
+            [Enum.KeyCode.E] = true,
+            [Enum.KeyCode.Q] = true,
+            [Enum.KeyCode.F] = true,
+            [Enum.KeyCode.N] = true,
+            [Enum.KeyCode.G] = true,
+            [Enum.KeyCode.RightShift] = true,
+        }
+
+        if input.KeyCode ~= Enum.KeyCode.Unknown and not reservedKeys[input.KeyCode] then
+            FC.key = input.KeyCode
+            FC.capturing = false
+            FC.refreshKeybind()
+            setTeleportStatus("Đã gán phím " .. FC.key.Name .. " để bật/tắt Free Cam.")
+        else
+            setTeleportStatus("Phím này đang được dùng cho chức năng khác. Hãy chọn phím khác.")
+        end
+        return
+    end
+
+    if input.KeyCode == Enum.KeyCode.Escape and FC.enabled then
+        stopFreecam(false)
+        return
+    end
+
     if processed or UserInputService:GetFocusedTextBox() then
         return
     end
 
-    if input.KeyCode == Enum.KeyCode.F then
+    if input.KeyCode == FC.key then
+        toggleFreecam()
+    elseif input.KeyCode == Enum.KeyCode.F then
         toggleFlight()
     elseif input.KeyCode == Enum.KeyCode.N then
         toggleNoclip()
     elseif input.KeyCode == Enum.KeyCode.G then
         setESPEnabled(not ESP.Enabled)
         refreshESPButtons()
-    elseif input.KeyCode == Enum.KeyCode.RightShift then
+    elseif input.KeyCode == SET.windowKey then
         toggleWindow()
     end
 end)
 
 closeBtn.Activated:Connect(function()
+    if FC.enabled then stopFreecam(false) end
     if flying then
         stopFlight()
     end
-    -- Luôn tắt NoClip và ESP để khôi phục trạng thái trước khi đóng.
+
     setNoclip(false)
     ESP.Destroy()
     stopSpeedMode(true)
@@ -1801,6 +2097,7 @@ closeBtn.Activated:Connect(function()
 end)
 
 player.CharacterAdded:Connect(function(newCharacter)
+    if FC.enabled then stopFreecam(false) end
     if flying then
         stopFlight()
     end
@@ -1823,3 +2120,101 @@ player.CharacterAdded:Connect(function(newCharacter)
         end)
     end
 end)
+
+function SET.build()
+    return {
+        esp = ESP.Enabled,
+        noclip = noclip,
+        speedMode = speedMode,
+        walkSpeed = requestedWalkSpeed,
+        windowKey = SET.windowKey.Name,
+        freecamKey = FC.key.Name,
+        freecamSpeed = FC.speedBox.Text,
+        firstPerson = ZM.firstPerson,
+        maxZoom = ZM.customMax,
+    }
+end
+
+function SET.save()
+    if not fileStorageAvailable then
+        SET.setStatus("Executor không hỗ trợ lưu file.")
+        return
+    end
+    local ok, err = pcall(function()
+        fileWrite(SET.file, HttpService:JSONEncode(SET.build()))
+    end)
+    SET.setStatus(ok and "Đã lưu cấu hình." or ("Không thể lưu: " .. tostring(err)))
+end
+
+function SET.load()
+    if not fileStorageAvailable then
+        return
+    end
+    local ok, data = pcall(function()
+        if type(fileExists) == "function" and not fileExists(SET.file) then
+            return nil
+        end
+        return HttpService:JSONDecode(fileRead(SET.file))
+    end)
+    if not ok or type(data) ~= "table" then
+        return
+    end
+
+    if type(data.windowKey) == "string" and Enum.KeyCode[data.windowKey] then
+        SET.windowKey = Enum.KeyCode[data.windowKey]
+    end
+    if type(data.freecamKey) == "string" and Enum.KeyCode[data.freecamKey] then
+        FC.key = Enum.KeyCode[data.freecamKey]
+        FC.refreshKeybind()
+    end
+    if data.freecamSpeed ~= nil then
+        FC.speedBox.Text = tostring(data.freecamSpeed)
+    end
+    if type(data.walkSpeed) == "number" then
+        requestedWalkSpeed = data.walkSpeed
+        walkSpeedBox.Text = tostring(data.walkSpeed)
+    end
+    if data.noclip == true then
+        setNoclip(true)
+    end
+    if data.esp == true then
+        setESPEnabled(true)
+        refreshESPButtons()
+    end
+    if data.firstPerson == true then
+        ZM.firstPerson = true
+        player.CameraMinZoomDistance = 0.5
+    end
+    if type(data.maxZoom) == "number" then
+        ZM.customMax = data.maxZoom
+        player.CameraMaxZoomDistance = data.maxZoom
+    end
+    if data.speedMode == "direct" or data.speedMode == "loop" then
+        local mode = data.speedMode
+        task.spawn(function()
+            if not player.Character then
+                player.CharacterAdded:Wait()
+            end
+            local hum = player.Character and player.Character:WaitForChild("Humanoid", 10)
+            if hum then
+                setSpeedMode(mode)
+            end
+        end)
+    end
+end
+
+SET.windowKeyBtn.Activated:Connect(function()
+    SET.capturing = true
+    SET.refresh()
+    SET.setStatus("Nhấn phím mới để mở/đóng popup (ESC để hủy).")
+end)
+
+SET.themeBtn.Activated:Connect(function()
+    SET.setStatus("Chưa có theme nào. Theme sẽ được thêm sau.")
+end)
+
+SET.saveBtn.Activated:Connect(SET.save)
+
+SET.load()
+SET.refresh()
+ZM.refresh()
