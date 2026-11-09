@@ -219,7 +219,7 @@ gui.Parent = playerGui
 local main = Instance.new("Frame")
 main.Name = "Main"
 main.Size = WINDOW_SIZE
-main.Position = UDim2.new(0.08, 0, 0.12, 0)
+main.Position = UDim2.new(0.5, -WINDOW_SIZE.X.Offset / 2, 0.5, -WINDOW_SIZE.Y.Offset / 2)
 main.BackgroundColor3 = COLOR_BG
 main.BorderSizePixel = 0
 main.Active = true
@@ -257,36 +257,40 @@ ZM.originalMin = player.CameraMinZoomDistance
 ZM.firstPerson = false
 
 local flyTab = makeButton(main, "TabFly", "FLY", UDim2.fromOffset(14, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
-local serverTab = makeButton(main, "TabServer", "SERVER", UDim2.fromOffset(76, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
-local espTab = makeButton(main, "TabESP", "ESP", UDim2.fromOffset(138, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
-local teleportTab = makeButton(main, "TabTeleport", "TELEPORT", UDim2.fromOffset(200, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
-local speedTab = makeButton(main, "TabSpeed", "SPEED", UDim2.fromOffset(262, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
-ZM.tab = makeButton(main, "TabZoom", "ZOOM", UDim2.fromOffset(324, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
-local aimTab = makeButton(main, "TabAim", "AIM", UDim2.fromOffset(386, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+local speedTab = makeButton(main, "TabSpeed", "SPEED", UDim2.fromOffset(76, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+local teleportTab = makeButton(main, "TabTeleport", "TELEPORT", UDim2.fromOffset(138, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+local aimTab = makeButton(main, "TabAim", "AIM", UDim2.fromOffset(200, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+local espTab = makeButton(main, "TabESP", "ESP", UDim2.fromOffset(262, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+ZM.tab = makeButton(main, "TabVisual", "VISUAL", UDim2.fromOffset(324, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
+local serverTab = makeButton(main, "TabServer", "SERVER", UDim2.fromOffset(386, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
 SET.tab = makeButton(main, "TabSetting", "SET", UDim2.fromOffset(448, 44), UDim2.fromOffset(58, 30), COLOR_TAB_OFF, 9)
-for _, tab in ipairs({ flyTab, serverTab, espTab, teleportTab, speedTab, ZM.tab, aimTab, SET.tab }) do
+for _, tab in ipairs({ flyTab, speedTab, teleportTab, aimTab, espTab, ZM.tab, serverTab, SET.tab }) do
     tab.TextColor3 = COLOR_TEXT
 end
 
 local flyPage = Instance.new("Frame")
 flyPage.Name = "FlyPage"
 flyPage.Position = UDim2.fromOffset(0, 84)
-flyPage.Size = UDim2.fromOffset(520, 306)
+flyPage.Size = UDim2.fromOffset(520, 386)
 flyPage.BackgroundTransparency = 1
 flyPage.Parent = main
 
+local flyTitle = makeLabel(flyPage, "FlyTitle", "DI CHUYỂN & BAY",
+    UDim2.fromOffset(12, 8), UDim2.fromOffset(496, 20), 12)
+flyTitle.TextColor3 = COLOR_HINT
+
 local toggle = makeButton(flyPage, "ToggleFly", "FLY: OFF",
-    UDim2.fromOffset(12, 10), UDim2.fromOffset(244, 40), COLOR_FLY_OFF, 14)
+    UDim2.fromOffset(12, 34), UDim2.fromOffset(244, 40), COLOR_FLY_OFF, 14)
 
 local noclipButton = makeButton(flyPage, "ToggleNoClip", "NOCLIP: OFF",
-    UDim2.fromOffset(264, 10), UDim2.fromOffset(244, 40), COLOR_NOCLIP_OFF, 14)
+    UDim2.fromOffset(264, 34), UDim2.fromOffset(244, 40), COLOR_NOCLIP_OFF, 14)
 
 local minus = makeButton(flyPage, "Minus", "-",
-    UDim2.fromOffset(12, 62), UDim2.fromOffset(44, 38), COLOR_MINUS, 18)
+    UDim2.fromOffset(12, 86), UDim2.fromOffset(44, 38), COLOR_MINUS, 18)
 
 local countBox = Instance.new("TextBox")
 countBox.Name = "SpeedBox"
-countBox.Position = UDim2.fromOffset(64, 62)
+countBox.Position = UDim2.fromOffset(64, 86)
 countBox.Size = UDim2.fromOffset(392, 38)
 countBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
 countBox.BorderSizePixel = 0
@@ -300,10 +304,10 @@ countBox.Parent = flyPage
 makeCorner(countBox, UDim.new(0, 7))
 
 local plus = makeButton(flyPage, "Plus", "+",
-    UDim2.fromOffset(464, 62), UDim2.fromOffset(44, 38), COLOR_PLUS, 18)
+    UDim2.fromOffset(464, 86), UDim2.fromOffset(44, 38), COLOR_PLUS, 18)
 
 local hint = makeLabel(flyPage, "Hint", "E: lên   Q: xuống   E gần vật: tương tác   RightShift: ẩn/hiện",
-    UDim2.fromOffset(12, 116), UDim2.fromOffset(496, 22), 11)
+    UDim2.fromOffset(12, 140), UDim2.fromOffset(496, 22), 11)
 hint.Font = Enum.Font.Gotham
 hint.TextColor3 = COLOR_HINT
 hint.TextXAlignment = Enum.TextXAlignment.Center
@@ -311,7 +315,7 @@ hint.TextXAlignment = Enum.TextXAlignment.Center
 local serverPage = Instance.new("Frame")
 serverPage.Name = "ServerPage"
 serverPage.Position = UDim2.fromOffset(0, 84)
-serverPage.Size = UDim2.fromOffset(520, 306)
+serverPage.Size = UDim2.fromOffset(520, 386)
 serverPage.BackgroundTransparency = 1
 serverPage.Visible = false
 serverPage.Parent = main
@@ -344,7 +348,7 @@ local sortBtn = makeButton(serverPage, "Sort", "SẮP XẾP: ÍT → NHIỀU",
 local serverList = Instance.new("ScrollingFrame")
 serverList.Name = "ServerList"
 serverList.Position = UDim2.fromOffset(12, 76)
-serverList.Size = UDim2.fromOffset(496, 224)
+serverList.Size = UDim2.fromOffset(496, 302)
 serverList.BackgroundColor3 = COLOR_LIST
 serverList.BorderSizePixel = 0
 serverList.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -386,9 +390,13 @@ bubble.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 bubble.BackgroundTransparency = 0
 bubble.TextSize = 24
 
+local function centeredWindowPosition()
+    return UDim2.new(0.5, -WINDOW_SIZE.X.Offset / 2, 0.5, -WINDOW_SIZE.Y.Offset / 2)
+end
+
 local windowOpen = true
 local windowBusy = false
-local openPosition = main.Position
+local openPosition = centeredWindowPosition()
 
 local function tweenWindow(info, goal, onDone)
     local tween = TweenService:Create(main, info, goal)
@@ -425,6 +433,7 @@ local function openWindow()
     end
     windowBusy = true
     windowOpen = true
+    openPosition = centeredWindowPosition()
 
     bubble.Visible = false
     main.Visible = true
@@ -449,6 +458,31 @@ end
 
 setupBubble(bubble, openWindow)
 
+do
+    local viewportConnection = nil
+
+    local function bindViewport()
+        if viewportConnection then
+            viewportConnection:Disconnect()
+            viewportConnection = nil
+        end
+
+        local camera = workspace.CurrentCamera
+        if not camera then
+            return
+        end
+
+        viewportConnection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+            if windowOpen and not windowBusy then
+                main.Position = centeredWindowPosition()
+            end
+        end)
+    end
+
+    bindViewport()
+    workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindViewport)
+end
+
 local ESP = {
     Enabled = false,
     Boxes = true,
@@ -457,9 +491,13 @@ local ESP = {
     Health = true,
     Tracers = false,
     TeamCheck = false,
+    Skeleton = true,
+    OcclusionCheck = true,
     MaxDistance = 1500,
     EnemyColor = Color3.fromRGB(255, 60, 60),
     TeamColor = Color3.fromRGB(60, 255, 120),
+    VisibleColor = Color3.fromRGB(70, 255, 130),
+    BlockedColor = Color3.fromRGB(255, 60, 60),
 }
 
 ESP.Available = pcall(function()
@@ -467,6 +505,7 @@ ESP.Available = pcall(function()
 end)
 
 local espObjects = {}
+local espOcclusion = {}
 local espConnection
 
 local function newDrawing(class, props)
@@ -483,6 +522,11 @@ local function createESP(targetPlayer)
         return existing
     end
 
+    local skeleton = {}
+    for index = 1, 14 do
+        skeleton[index] = newDrawing("Line", { Thickness = 1, Visible = false })
+    end
+
     local obj = {
         Outline = newDrawing("Square", { Thickness = 3, Filled = false, Color = Color3.new(0, 0, 0), Transparency = 0.6, Visible = false }),
         Box = newDrawing("Square", { Thickness = 1, Filled = false, Visible = false }),
@@ -490,6 +534,7 @@ local function createESP(targetPlayer)
         Tracer = newDrawing("Line", { Thickness = 1, Visible = false }),
         HpBack = newDrawing("Line", { Thickness = 3, Color = Color3.new(0, 0, 0), Visible = false }),
         HpFill = newDrawing("Line", { Thickness = 2, Visible = false }),
+        Skeleton = skeleton,
     }
 
     espObjects[targetPlayer] = obj
@@ -497,8 +542,14 @@ local function createESP(targetPlayer)
 end
 
 local function hideObj(obj)
-    for _, d in pairs(obj) do
-        d.Visible = false
+    for key, d in pairs(obj) do
+        if key == "Skeleton" then
+            for _, line in ipairs(d) do
+                line.Visible = false
+            end
+        else
+            d.Visible = false
+        end
     end
 end
 
@@ -507,10 +558,17 @@ local function removeESP(targetPlayer)
     if not obj then
         return
     end
-    for _, d in pairs(obj) do
-        d:Remove()
+    for key, d in pairs(obj) do
+        if key == "Skeleton" then
+            for _, line in ipairs(d) do
+                line:Remove()
+            end
+        else
+            d:Remove()
+        end
     end
     espObjects[targetPlayer] = nil
+    espOcclusion[targetPlayer] = nil
 end
 
 local function isTeammate(targetPlayer)
@@ -520,6 +578,90 @@ end
 local function toScreen(camera, worldPos)
     local v = camera:WorldToViewportPoint(worldPos)
     return Vector2.new(v.X, v.Y), v.Z > 0
+end
+
+local ESP_BONES_R15 = {
+    { "Head", "UpperTorso" },
+    { "UpperTorso", "LowerTorso" },
+    { "UpperTorso", "LeftUpperArm" },
+    { "LeftUpperArm", "LeftLowerArm" },
+    { "LeftLowerArm", "LeftHand" },
+    { "UpperTorso", "RightUpperArm" },
+    { "RightUpperArm", "RightLowerArm" },
+    { "RightLowerArm", "RightHand" },
+    { "LowerTorso", "LeftUpperLeg" },
+    { "LeftUpperLeg", "LeftLowerLeg" },
+    { "LeftLowerLeg", "LeftFoot" },
+    { "LowerTorso", "RightUpperLeg" },
+    { "RightUpperLeg", "RightLowerLeg" },
+    { "RightLowerLeg", "RightFoot" },
+}
+
+local ESP_BONES_R6 = {
+    { "Head", "Torso" },
+    { "Torso", "Left Arm" },
+    { "Torso", "Right Arm" },
+    { "Torso", "Left Leg" },
+    { "Torso", "Right Leg" },
+}
+
+local espRay = {
+    params = RaycastParams.new(),
+    filter = {},
+}
+espRay.params.FilterType = Enum.RaycastFilterType.Exclude
+espRay.params.IgnoreWater = true
+
+local function isESPOccluded(targetPlayer, camera, position, character)
+    local cached = espOcclusion[targetPlayer]
+    local now = os.clock()
+    if cached and now - cached.time < 0.12 then
+        return cached.visible
+    end
+
+    table.clear(espRay.filter)
+    local localCharacter = player.Character
+    if localCharacter then
+        espRay.filter[1] = localCharacter
+    end
+    espRay.params.FilterDescendantsInstances = espRay.filter
+
+    local hit = workspace:Raycast(camera.CFrame.Position, position - camera.CFrame.Position, espRay.params)
+    local visible = true
+    if hit and hit.Instance then
+        visible = hit.Instance:IsDescendantOf(character)
+    end
+
+    espOcclusion[targetPlayer] = { time = now, visible = visible }
+    return visible
+end
+
+local function updateESPSkeleton(char, obj, camera, color)
+    local bones = char:FindFirstChild("UpperTorso") and ESP_BONES_R15 or ESP_BONES_R6
+    local lines = obj.Skeleton
+
+    for index = 1, #lines do
+        local line = lines[index]
+        local bone = bones[index]
+        local shown = false
+
+        if ESP.Skeleton and bone then
+            local partA = char:FindFirstChild(bone[1])
+            local partB = char:FindFirstChild(bone[2])
+            if partA and partB then
+                local from, fromFront = toScreen(camera, partA.Position)
+                local to, toFront = toScreen(camera, partB.Position)
+                if fromFront and toFront then
+                    line.From = from
+                    line.To = to
+                    line.Color = color
+                    shown = true
+                end
+            end
+        end
+
+        line.Visible = shown
+    end
 end
 
 local function updateESPPlayer(targetPlayer, obj, camera, localRoot)
@@ -547,6 +689,10 @@ local function updateESPPlayer(targetPlayer, obj, camera, localRoot)
     end
 
     local color = (ESP.TeamCheck and isTeammate(targetPlayer)) and ESP.TeamColor or ESP.EnemyColor
+    if ESP.OcclusionCheck then
+        local visible = isESPOccluded(targetPlayer, camera, head.Position, char)
+        color = visible and ESP.VisibleColor or ESP.BlockedColor
+    end
 
     local height = math.abs(footBottom.Y - headTop.Y)
     local width = height / 2
@@ -588,7 +734,11 @@ local function updateESPPlayer(targetPlayer, obj, camera, localRoot)
         obj.HpBack.To = Vector2.new(x, boxPos.Y + height)
         obj.HpFill.From = Vector2.new(x, boxPos.Y + height)
         obj.HpFill.To = Vector2.new(x, boxPos.Y + height * (1 - ratio))
-        obj.HpFill.Color = Color3.fromHSV(ratio * 0.33, 1, 1)
+        if ESP.OcclusionCheck then
+            obj.HpFill.Color = color
+        else
+            obj.HpFill.Color = Color3.fromHSV(ratio * 0.33, 1, 1)
+        end
     end
 
     obj.Tracer.Visible = ESP.Tracers
@@ -598,6 +748,8 @@ local function updateESPPlayer(targetPlayer, obj, camera, localRoot)
         obj.Tracer.To = Vector2.new(centerX, footBottom.Y)
         obj.Tracer.Color = color
     end
+
+    updateESPSkeleton(char, obj, camera, color)
 end
 
 local function refreshESP()
@@ -646,7 +798,7 @@ Players.PlayerRemoving:Connect(removeESP)
 local espPage = Instance.new("Frame")
 espPage.Name = "ESPPage"
 espPage.Position = UDim2.fromOffset(0, 84)
-espPage.Size = UDim2.fromOffset(520, 376)
+espPage.Size = UDim2.fromOffset(520, 386)
 espPage.BackgroundTransparency = 1
 espPage.Visible = false
 espPage.Parent = main
@@ -654,11 +806,13 @@ espPage.Parent = main
 local espToggles = {
     { key = "Enabled", text = "ESP" },
     { key = "Boxes", text = "BOX" },
+    { key = "Skeleton", text = "XƯƠNG" },
     { key = "Names", text = "TÊN" },
     { key = "Distance", text = "KHOẢNG CÁCH" },
     { key = "Health", text = "MÁU" },
     { key = "Tracers", text = "TRACER" },
     { key = "TeamCheck", text = "TEAM CHECK" },
+    { key = "OcclusionCheck", text = "CHECK VẬT CẢN" },
 }
 local espButtons = {}
 
@@ -689,8 +843,12 @@ for i, item in ipairs(espToggles) do
     end)
 end
 
-local espHint = makeLabel(espPage, "Hint", "G: bật/tắt ESP",
-    UDim2.fromOffset(12, 190), UDim2.fromOffset(496, 18), 10)
+if espButtons.OcclusionCheck then
+    espButtons.OcclusionCheck.Size = UDim2.fromOffset(496, 40)
+end
+
+local espHint = makeLabel(espPage, "Hint", "G: bật/tắt ESP   |   CHECK VẬT CẢN: xanh = nhìn thấy, đỏ = bị che",
+    UDim2.fromOffset(12, 242), UDim2.fromOffset(496, 20), 9)
 espHint.Font = Enum.Font.Gotham
 espHint.TextColor3 = COLOR_HINT
 espHint.TextXAlignment = Enum.TextXAlignment.Center
@@ -795,7 +953,7 @@ do
 
     local espAimNote = makeLabel(espPage, "AimMovedNote",
         "Aim Assist đã chuyển sang tab AIM ở thanh tab phía trên.",
-        UDim2.fromOffset(12, 214), UDim2.fromOffset(496, 20), 10)
+        UDim2.fromOffset(12, 268), UDim2.fromOffset(496, 20), 10)
     espAimNote.Font = Enum.Font.Gotham
     espAimNote.TextColor3 = COLOR_HINT
     espAimNote.TextXAlignment = Enum.TextXAlignment.Center
@@ -963,7 +1121,7 @@ do
             circle.NumSides = 64
             circle.Thickness = 1.5
             circle.Filled = false
-            circle.Color = Color3.fromRGB(90, 200, 255)
+            circle.Color = Color3.fromRGB(255, 90, 90)
             circle.Transparency = 0.85
             circle.Visible = false
             Aim.Circle = circle
@@ -1245,7 +1403,7 @@ do
 
         circle.Position = camera.ViewportSize / 2
         circle.Radius = Aim.FOV
-        circle.Color = Aim.Locked and Color3.fromRGB(90, 235, 150) or Color3.fromRGB(90, 200, 255)
+        circle.Color = Aim.Locked and Color3.fromRGB(90, 235, 150) or Color3.fromRGB(255, 90, 90)
         circle.Visible = true
     end
 
@@ -1515,8 +1673,8 @@ do
 
         refreshAimButtons()
 
-        if data.aimEnabled == true then
-            setAimEnabled(true)
+        if type(data.aimEnabled) == "boolean" then
+            setAimEnabled(data.aimEnabled)
         end
     end
 
@@ -1551,14 +1709,18 @@ end
 local teleportPage = Instance.new("Frame")
 teleportPage.Name = "TeleportPage"
 teleportPage.Position = UDim2.fromOffset(0, 84)
-teleportPage.Size = UDim2.fromOffset(520, 306)
+teleportPage.Size = UDim2.fromOffset(520, 386)
 teleportPage.BackgroundTransparency = 1
 teleportPage.Visible = false
 teleportPage.Parent = main
 
+local teleportTitle = makeLabel(teleportPage, "TeleportTitle", "DỊCH CHUYỂN & FREE CAM",
+    UDim2.fromOffset(12, 8), UDim2.fromOffset(496, 20), 12)
+teleportTitle.TextColor3 = COLOR_HINT
+
 local pointNameBox = Instance.new("TextBox")
 pointNameBox.Name = "PointName"
-pointNameBox.Position = UDim2.fromOffset(12, 10)
+pointNameBox.Position = UDim2.fromOffset(12, 36)
 pointNameBox.Size = UDim2.fromOffset(330, 34)
 pointNameBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
 pointNameBox.BorderSizePixel = 0
@@ -1572,15 +1734,15 @@ pointNameBox.Parent = teleportPage
 makeCorner(pointNameBox, UDim.new(0, 7))
 
 local savePointBtn = makeButton(teleportPage, "SavePoint", "LƯU VỊ TRÍ",
-    UDim2.fromOffset(352, 10), UDim2.fromOffset(156, 34), COLOR_PLUS, 12)
+    UDim2.fromOffset(352, 36), UDim2.fromOffset(156, 34), COLOR_PLUS, 12)
 
 local FC = {}
 
 FC.toggleBtn = makeButton(teleportPage, "FreecamToggle", "FREE CAM: OFF",
-    UDim2.fromOffset(12, 50), UDim2.fromOffset(244, 34), COLOR_NOCLIP_OFF, 12)
+    UDim2.fromOffset(12, 76), UDim2.fromOffset(244, 34), COLOR_NOCLIP_OFF, 12)
 FC.speedBox = Instance.new("TextBox")
 FC.speedBox.Name = "FreecamSpeedBox"
-FC.speedBox.Position = UDim2.fromOffset(264, 50)
+FC.speedBox.Position = UDim2.fromOffset(264, 76)
 FC.speedBox.Size = UDim2.fromOffset(244, 34)
 FC.speedBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
 FC.speedBox.BorderSizePixel = 0
@@ -1594,18 +1756,18 @@ FC.speedBox.Parent = teleportPage
 makeCorner(FC.speedBox, UDim.new(0, 7))
 
 FC.keybindBtn = makeButton(teleportPage, "FreecamKeybind", "PHÍM FREE CAM: P",
-    UDim2.fromOffset(12, 88), UDim2.fromOffset(196, 26), COLOR_TAB_OFF, 10)
+    UDim2.fromOffset(12, 114), UDim2.fromOffset(196, 26), COLOR_TAB_OFF, 10)
 
 local teleportStatus = makeLabel(teleportPage, "TeleportStatus", "WASD di chuyển | E lên | Q xuống | Chuột xoay",
-    UDim2.fromOffset(216, 88), UDim2.fromOffset(292, 26), 9)
+    UDim2.fromOffset(216, 114), UDim2.fromOffset(292, 26), 9)
 teleportStatus.Font = Enum.Font.Gotham
 teleportStatus.TextColor3 = COLOR_HINT
 teleportStatus.TextWrapped = true
 
 local pointList = Instance.new("ScrollingFrame")
 pointList.Name = "PointList"
-pointList.Position = UDim2.fromOffset(12, 122)
-pointList.Size = UDim2.fromOffset(496, 176)
+pointList.Position = UDim2.fromOffset(12, 148)
+pointList.Size = UDim2.fromOffset(496, 222)
 pointList.BackgroundColor3 = COLOR_LIST
 pointList.BorderSizePixel = 0
 pointList.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -1802,7 +1964,7 @@ renderSavedPoints()
 local speedPage = Instance.new("Frame")
 speedPage.Name = "SpeedPage"
 speedPage.Position = UDim2.fromOffset(0, 84)
-speedPage.Size = UDim2.fromOffset(520, 306)
+speedPage.Size = UDim2.fromOffset(520, 386)
 speedPage.BackgroundTransparency = 1
 speedPage.Visible = false
 speedPage.Parent = main
@@ -2454,6 +2616,10 @@ local function clearServerList()
     end
 end
 
+local function serverRoom(server)
+    return math.max((server.maxPlayers or 0) - (server.playing or 0), 0)
+end
+
 local function createServerEntry(server, order)
     local row = Instance.new("Frame")
     row.Name = "ServerRow"
@@ -2475,7 +2641,8 @@ local function createServerEntry(server, order)
     info.TextXAlignment = Enum.TextXAlignment.Left
     info.TextYAlignment = Enum.TextYAlignment.Center
     info.TextTruncate = Enum.TextTruncate.AtEnd
-    info.Text = string.format("👥 %d / %d\nID: %s", server.playing, server.maxPlayers, tostring(server.id))
+    info.Text = string.format("👥 %d/%d  ·  còn %d chỗ\nID: %s",
+        server.playing, server.maxPlayers, serverRoom(server), tostring(server.id))
     info.Parent = row
 
     local isCurrent = server.id == game.JobId
@@ -2517,9 +2684,25 @@ local function renderServers(list)
 
     table.sort(sorted, function(a, b)
         if sortAscending then
-            return a.playing < b.playing
+            -- Ít người trước.
+            if a.playing ~= b.playing then
+                return a.playing < b.playing
+            end
+            if a.maxPlayers ~= b.maxPlayers then
+                return a.maxPlayers < b.maxPlayers
+            end
+            return tostring(a.id) < tostring(b.id)
         end
-        return a.playing > b.playing
+
+        -- Gần đầy trước: ưu tiên server còn ít chỗ trống nhất.
+        local roomA, roomB = serverRoom(a), serverRoom(b)
+        if roomA ~= roomB then
+            return roomA < roomB
+        end
+        if a.playing ~= b.playing then
+            return a.playing > b.playing
+        end
+        return tostring(a.id) < tostring(b.id)
     end)
 
     clearServerList()
@@ -2551,7 +2734,7 @@ local function refreshServerView(note)
 end
 
 local function updateSortButton()
-    sortBtn.Text = sortAscending and "SẮP XẾP: ÍT → NHIỀU" or "SẮP XẾP: NHIỀU → ÍT"
+    sortBtn.Text = sortAscending and "SẮP XẾP: ÍT → NHIỀU" or "SẮP XẾP: GẦN ĐẦY → ÍT"
 end
 
 local function setMaxDisplay(value)
@@ -2573,14 +2756,14 @@ local function getPageLimit(needed)
     return 100
 end
 
-local function fetchPage(cursor, limit)
+local function fetchPage(cursor, limit, order)
     if not requestFunc then
         return nil, "Executor không hỗ trợ HTTP request"
     end
 
     local url = string.format(
-        "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=%d",
-        game.PlaceId, limit
+        "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=%s&limit=%d",
+        game.PlaceId, order or "Asc", limit
     )
     if cursor then
         url = url .. "&cursor=" .. cursor
@@ -2625,8 +2808,13 @@ loadServers = function()
 
     local target = maxDisplay
     local limit = getPageLimit(target)
+    local order = sortAscending and "Asc" or "Desc"
+    -- Chế độ "gần đầy" gom thêm ứng viên để chọn server sát full nhất.
+    local collectCap = sortAscending and target or math.min(target * 2, MAX_DISPLAY)
+    local minimumPages = sortAscending and 1 or 2
 
-    setStatus(string.format("Đang quét... 0 / %d server", target))
+    setStatus(string.format("Đang quét... 0 / %d server (%s)",
+        target, sortAscending and "ít người" or "gần đầy"))
     refreshBtn.Text = "ĐANG QUÉT"
 
     task.spawn(function()
@@ -2635,21 +2823,26 @@ loadServers = function()
         local cursor = nil
         local pages = 0
         local errorMsg = nil
+        local nearFull = 0
+        local enough = false
 
         repeat
-            local data, err = fetchPage(cursor, limit)
+            local data, err = fetchPage(cursor, limit, order)
             if not data then
                 errorMsg = err
                 break
             end
 
             for _, server in ipairs(data.data or {}) do
-                if #found >= target then
+                if #found >= collectCap then
                     break
                 end
                 if server.playing < server.maxPlayers and not seen[server.id] then
                     seen[server.id] = true
                     table.insert(found, server)
+                    if serverRoom(server) <= 1 then
+                        nearFull += 1
+                    end
                 end
             end
 
@@ -2657,19 +2850,27 @@ loadServers = function()
             cursor = data.nextPageCursor
 
             renderServers(found)
-            setStatus(string.format("Đang quét... %d / %d server", #found, target))
+            setStatus(string.format("Đang quét... %d / %d server (%s)",
+                math.min(#found, target), target, sortAscending and "ít người" or "gần đầy"))
 
-            if #found < target and cursor and pages < MAX_SERVER_PAGES then
+            enough = #found >= target and pages >= minimumPages
+            if not enough and cursor and pages < MAX_SERVER_PAGES then
                 task.wait(PAGE_DELAY)
             end
-        until #found >= target or not cursor or pages >= MAX_SERVER_PAGES
+        until enough or not cursor or pages >= MAX_SERVER_PAGES
 
         if errorMsg and #found == 0 then
-
             setStatus("Lỗi: " .. errorMsg .. " (giữ danh sách cũ)")
         else
             cachedServers = found
-            refreshServerView(errorMsg and ("quét chưa đủ: " .. errorMsg) or nil)
+
+            local note = nil
+            if errorMsg then
+                note = "quét chưa đủ: " .. errorMsg
+            elseif not sortAscending and nearFull > 0 then
+                note = string.format("%d server gần đầy", nearFull)
+            end
+            refreshServerView(note)
         end
 
         refreshBtn.Text = "LÀM MỚI"
@@ -2677,113 +2878,357 @@ loadServers = function()
     end)
 end
 
-ZM.page = Instance.new("Frame")
-ZM.page.Name = "ZoomPage"
-ZM.page.Position = UDim2.fromOffset(0, 84)
-ZM.page.Size = UDim2.fromOffset(520, 306)
-ZM.page.BackgroundTransparency = 1
-ZM.page.Visible = false
-ZM.page.Parent = main
+local VIS = {}
 
-makeLabel(ZM.page, "ZoomTitle", "ZOOM CAMERA", UDim2.fromOffset(12, 12), UDim2.fromOffset(496, 24), 15)
+do
+    local Lighting = game:GetService("Lighting")
 
-ZM.currentLabel = makeLabel(ZM.page, "ZoomCurrent", "", UDim2.fromOffset(12, 42), UDim2.fromOffset(496, 22), 13)
-ZM.currentLabel.TextColor3 = COLOR_HINT
+    VIS.Fullbright = false
+    VIS.NoFog = false
 
-ZM.maxBox = Instance.new("TextBox")
-ZM.maxBox.Name = "ZoomMaxBox"
-ZM.maxBox.Position = UDim2.fromOffset(12, 72)
-ZM.maxBox.Size = UDim2.fromOffset(330, 38)
-ZM.maxBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
-ZM.maxBox.BorderSizePixel = 0
-ZM.maxBox.Font = Enum.Font.GothamBold
-ZM.maxBox.Text = ""
-ZM.maxBox.PlaceholderText = "Nhập max zoom (ví dụ 400)"
-ZM.maxBox.ClearTextOnFocus = false
-ZM.maxBox.TextColor3 = Color3.fromRGB(25, 30, 35)
-ZM.maxBox.TextSize = 15
-ZM.maxBox.Parent = ZM.page
-makeCorner(ZM.maxBox, UDim.new(0, 7))
+    ZM.page = Instance.new("Frame")
+    ZM.page.Name = "VisualPage"
+    ZM.page.Position = UDim2.fromOffset(0, 84)
+    ZM.page.Size = UDim2.fromOffset(520, 386)
+    ZM.page.BackgroundTransparency = 1
+    ZM.page.Visible = false
+    ZM.page.Parent = main
 
-ZM.applyBtn = makeButton(ZM.page, "ApplyMaxZoom", "ÁP DỤNG",
-    UDim2.fromOffset(352, 72), UDim2.fromOffset(156, 38), COLOR_PLUS, 13)
+    local visualTitle = makeLabel(ZM.page, "VisualTitle", "HÌNH ẢNH",
+        UDim2.fromOffset(12, 8), UDim2.fromOffset(496, 20), 12)
+    visualTitle.TextColor3 = COLOR_HINT
 
-ZM.resetBtn = makeButton(ZM.page, "ResetMaxZoom", "RESET MAX ZOOM",
-    UDim2.fromOffset(12, 122), UDim2.fromOffset(496, 34), COLOR_NOCLIP_OFF, 13)
+    local fullbrightBtn = makeButton(ZM.page, "Fullbright", "FULLBRIGHT: OFF",
+        UDim2.fromOffset(12, 32), UDim2.fromOffset(244, 38), COLOR_NOCLIP_OFF, 12)
+    local noFogBtn = makeButton(ZM.page, "NoFog", "NO FOG: OFF",
+        UDim2.fromOffset(264, 32), UDim2.fromOffset(244, 38), COLOR_NOCLIP_OFF, 12)
 
-ZM.firstPersonBtn = makeButton(ZM.page, "UnlockFirstPerson", "",
-    UDim2.fromOffset(12, 168), UDim2.fromOffset(496, 34), COLOR_NOCLIP_OFF, 13)
+    local zoomTitle = makeLabel(ZM.page, "ZoomTitle", "ZOOM CAMERA",
+        UDim2.fromOffset(12, 80), UDim2.fromOffset(496, 20), 12)
+    zoomTitle.TextColor3 = COLOR_HINT
 
-ZM.statusLabel = makeLabel(ZM.page, "ZoomStatus", "Nhập max zoom rồi nhấn ÁP DỤNG.",
-    UDim2.fromOffset(12, 214), UDim2.fromOffset(496, 50), 11)
-ZM.statusLabel.Font = Enum.Font.Gotham
-ZM.statusLabel.TextColor3 = COLOR_HINT
-ZM.statusLabel.TextWrapped = true
+    local currentLabel = makeLabel(ZM.page, "ZoomCurrent", "",
+        UDim2.fromOffset(12, 102), UDim2.fromOffset(496, 18), 11)
+    currentLabel.TextColor3 = COLOR_HINT
 
-function ZM.setStatus(message)
-    ZM.statusLabel.Text = message
-end
+    local maxBox = Instance.new("TextBox")
+    maxBox.Name = "ZoomMaxBox"
+    maxBox.Position = UDim2.fromOffset(12, 126)
+    maxBox.Size = UDim2.fromOffset(330, 38)
+    maxBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+    maxBox.BorderSizePixel = 0
+    maxBox.Font = Enum.Font.GothamBold
+    maxBox.Text = ""
+    maxBox.PlaceholderText = "Nhập max zoom (ví dụ 400)"
+    maxBox.ClearTextOnFocus = false
+    maxBox.TextColor3 = Color3.fromRGB(25, 30, 35)
+    maxBox.TextSize = 15
+    maxBox.Parent = ZM.page
+    makeCorner(maxBox, UDim.new(0, 7))
 
-function ZM.refresh()
-    ZM.currentLabel.Text = string.format("Max zoom: %s | Min zoom: %s",
-        tostring(player.CameraMaxZoomDistance), tostring(player.CameraMinZoomDistance))
-    ZM.maxBox.Text = tostring(player.CameraMaxZoomDistance)
-    ZM.firstPersonBtn.Text = ZM.firstPerson and "GÓC NHÌN THỨ NHẤT: ON" or "GÓC NHÌN THỨ NHẤT: OFF"
-    ZM.firstPersonBtn.BackgroundColor3 = ZM.firstPerson and COLOR_FLY_ON or COLOR_NOCLIP_OFF
-end
+    local applyBtn = makeButton(ZM.page, "ApplyMaxZoom", "ÁP DỤNG",
+        UDim2.fromOffset(352, 126), UDim2.fromOffset(156, 38), COLOR_PLUS, 13)
 
-ZM.applyBtn.Activated:Connect(function()
-    local number = tonumber(ZM.maxBox.Text)
-    if not number then
-        ZM.setStatus("Giá trị max zoom không hợp lệ.")
-        return
+    local resetBtn = makeButton(ZM.page, "ResetMaxZoom", "RESET MAX ZOOM",
+        UDim2.fromOffset(12, 172), UDim2.fromOffset(496, 32), COLOR_NOCLIP_OFF, 12)
+
+    local firstPersonBtn = makeButton(ZM.page, "UnlockFirstPerson", "",
+        UDim2.fromOffset(12, 210), UDim2.fromOffset(496, 32), COLOR_NOCLIP_OFF, 12)
+
+    local statusLabel = makeLabel(ZM.page, "VisualStatus",
+        "FULLBRIGHT giúp nhìn rõ bản đồ; NO FOG xóa sương mù.",
+        UDim2.fromOffset(12, 250), UDim2.fromOffset(496, 44), 10)
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextColor3 = COLOR_HINT
+    statusLabel.TextWrapped = true
+
+    local visualHint = makeLabel(ZM.page, "VisualHint",
+        "Zoom: nhập max zoom rồi nhấn ÁP DỤNG. Góc nhìn thứ nhất: kéo zoom về sát.",
+        UDim2.fromOffset(12, 306), UDim2.fromOffset(496, 44), 10)
+    visualHint.Font = Enum.Font.Gotham
+    visualHint.TextColor3 = COLOR_HINT
+    visualHint.TextWrapped = true
+
+    function ZM.setStatus(message)
+        statusLabel.Text = message
     end
-    number = math.clamp(number, 0.5, 100000)
-    player.CameraMaxZoomDistance = number
-    ZM.customMax = number
-    ZM.setStatus("Đã đặt max zoom: " .. tostring(number))
-    ZM.refresh()
-end)
 
-ZM.resetBtn.Activated:Connect(function()
-    player.CameraMaxZoomDistance = ZM.originalMax
-    ZM.customMax = nil
-    ZM.setStatus("Đã khôi phục max zoom gốc: " .. tostring(ZM.originalMax))
-    ZM.refresh()
-end)
+    function ZM.refresh()
+        currentLabel.Text = string.format("Max zoom: %s | Min zoom: %s",
+            tostring(player.CameraMaxZoomDistance), tostring(player.CameraMinZoomDistance))
+        maxBox.Text = tostring(player.CameraMaxZoomDistance)
+        firstPersonBtn.Text = ZM.firstPerson and "GÓC NHÌN THỨ NHẤT: ON" or "GÓC NHÌN THỨ NHẤT: OFF"
+        firstPersonBtn.BackgroundColor3 = ZM.firstPerson and COLOR_FLY_ON or COLOR_NOCLIP_OFF
+    end
 
-ZM.firstPersonBtn.Activated:Connect(function()
-    ZM.firstPerson = not ZM.firstPerson
-    player.CameraMinZoomDistance = ZM.firstPerson and 0.5 or ZM.originalMin
-    ZM.setStatus(ZM.firstPerson
-        and "Đã mở khóa góc nhìn thứ nhất: kéo zoom về sát để vào góc nhìn thứ nhất."
-        or "Đã khôi phục min zoom gốc của game.")
-    ZM.refresh()
-end)
+    applyBtn.Activated:Connect(function()
+        local number = tonumber(maxBox.Text)
+        if not number then
+            ZM.setStatus("Giá trị max zoom không hợp lệ.")
+            return
+        end
+        number = math.clamp(number, 0.5, 100000)
+        player.CameraMaxZoomDistance = number
+        ZM.customMax = number
+        ZM.setStatus("Đã đặt max zoom: " .. tostring(number))
+        ZM.refresh()
+    end)
 
-ZM.refresh()
+    resetBtn.Activated:Connect(function()
+        player.CameraMaxZoomDistance = ZM.originalMax
+        ZM.customMax = nil
+        ZM.setStatus("Đã khôi phục max zoom gốc: " .. tostring(ZM.originalMax))
+        ZM.refresh()
+    end)
+
+    firstPersonBtn.Activated:Connect(function()
+        ZM.firstPerson = not ZM.firstPerson
+        player.CameraMinZoomDistance = ZM.firstPerson and 0.5 or ZM.originalMin
+        ZM.setStatus(ZM.firstPerson
+            and "Đã mở khóa góc nhìn thứ nhất: kéo zoom về sát để vào góc nhìn thứ nhất."
+            or "Đã khôi phục min zoom gốc của game.")
+        ZM.refresh()
+    end)
+
+    -- ===== FULLBRIGHT / NO FOG =====
+    local saved = nil
+    local atmosphere = nil
+    local atmosphereDensity = nil
+    local visualConnection = nil
+
+    local function saveLighting()
+        if saved then
+            return
+        end
+        saved = {
+            Brightness = Lighting.Brightness,
+            Ambient = Lighting.Ambient,
+            OutdoorAmbient = Lighting.OutdoorAmbient,
+            GlobalShadows = Lighting.GlobalShadows,
+            EnvironmentDiffuseScale = Lighting.EnvironmentDiffuseScale,
+            EnvironmentSpecularScale = Lighting.EnvironmentSpecularScale,
+            FogStart = Lighting.FogStart,
+            FogEnd = Lighting.FogEnd,
+            FogColor = Lighting.FogColor,
+        }
+    end
+
+    local function findAtmosphere()
+        if not atmosphere or not atmosphere.Parent then
+            atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+            atmosphereDensity = atmosphere and atmosphere.Density or nil
+        end
+        return atmosphere
+    end
+
+    local function enforceFullbright()
+        Lighting.Brightness = math.max(Lighting.Brightness, 3)
+        Lighting.Ambient = Color3.fromRGB(210, 210, 210)
+        Lighting.OutdoorAmbient = Color3.fromRGB(210, 210, 210)
+        Lighting.GlobalShadows = false
+        Lighting.EnvironmentDiffuseScale = 0
+        Lighting.EnvironmentSpecularScale = 0
+    end
+
+    local function enforceNoFog()
+        Lighting.FogStart = 0
+        Lighting.FogEnd = 100000
+        local currentAtmosphere = findAtmosphere()
+        if currentAtmosphere then
+            currentAtmosphere.Density = 0
+        end
+    end
+
+    local function restoreFullbright()
+        if not saved then
+            return
+        end
+        Lighting.Brightness = saved.Brightness
+        Lighting.Ambient = saved.Ambient
+        Lighting.OutdoorAmbient = saved.OutdoorAmbient
+        Lighting.GlobalShadows = saved.GlobalShadows
+        Lighting.EnvironmentDiffuseScale = saved.EnvironmentDiffuseScale
+        Lighting.EnvironmentSpecularScale = saved.EnvironmentSpecularScale
+    end
+
+    local function restoreNoFog()
+        if not saved then
+            return
+        end
+        Lighting.FogStart = saved.FogStart
+        Lighting.FogEnd = saved.FogEnd
+        Lighting.FogColor = saved.FogColor
+        if atmosphere and atmosphere.Parent and atmosphereDensity then
+            atmosphere.Density = atmosphereDensity
+        end
+    end
+
+    local function updateVisualLoop()
+        local active = VIS.Fullbright or VIS.NoFog
+        if active and not visualConnection then
+            local lastApply = 0
+            visualConnection = RunService.Heartbeat:Connect(function()
+                local now = os.clock()
+                if now - lastApply < 0.1 then
+                    return
+                end
+                lastApply = now
+
+                if VIS.Fullbright then
+                    enforceFullbright()
+                end
+                if VIS.NoFog then
+                    enforceNoFog()
+                end
+            end)
+        elseif not active and visualConnection then
+            visualConnection:Disconnect()
+            visualConnection = nil
+        end
+    end
+
+    local function refreshVisualButtons()
+        fullbrightBtn.Text = "FULLBRIGHT: " .. (VIS.Fullbright and "ON" or "OFF")
+        fullbrightBtn.BackgroundColor3 = VIS.Fullbright and COLOR_FLY_ON or COLOR_NOCLIP_OFF
+        noFogBtn.Text = "NO FOG: " .. (VIS.NoFog and "ON" or "OFF")
+        noFogBtn.BackgroundColor3 = VIS.NoFog and COLOR_FLY_ON or COLOR_NOCLIP_OFF
+    end
+
+    function VIS.setFullbright(state)
+        VIS.Fullbright = state == true
+        if VIS.Fullbright then
+            saveLighting()
+            enforceFullbright()
+        else
+            restoreFullbright()
+        end
+        updateVisualLoop()
+        refreshVisualButtons()
+        ZM.setStatus(VIS.Fullbright and "Đã bật FULLBRIGHT." or "Đã tắt FULLBRIGHT.")
+    end
+
+    function VIS.setNoFog(state)
+        VIS.NoFog = state == true
+        if VIS.NoFog then
+            saveLighting()
+            enforceNoFog()
+        else
+            restoreNoFog()
+        end
+        updateVisualLoop()
+        refreshVisualButtons()
+        ZM.setStatus(VIS.NoFog and "Đã bật NO FOG." or "Đã tắt NO FOG.")
+    end
+
+    fullbrightBtn.Activated:Connect(function()
+        VIS.setFullbright(not VIS.Fullbright)
+    end)
+
+    noFogBtn.Activated:Connect(function()
+        VIS.setNoFog(not VIS.NoFog)
+    end)
+
+    function VIS.applyConfig(data)
+        if type(data) ~= "table" then
+            return
+        end
+        if type(data.fullbright) == "boolean" and data.fullbright ~= VIS.Fullbright then
+            VIS.setFullbright(data.fullbright)
+        end
+        if type(data.noFog) == "boolean" and data.noFog ~= VIS.NoFog then
+            VIS.setNoFog(data.noFog)
+        end
+    end
+
+    function VIS.destroy()
+        if VIS.Fullbright then
+            VIS.setFullbright(false)
+        end
+        if VIS.NoFog then
+            VIS.setNoFog(false)
+        end
+        if visualConnection then
+            visualConnection:Disconnect()
+            visualConnection = nil
+        end
+    end
+
+    refreshVisualButtons()
+    ZM.refresh()
+end
 
 SET.page = Instance.new("Frame")
 SET.page.Name = "SettingPage"
 SET.page.Position = UDim2.fromOffset(0, 84)
-SET.page.Size = UDim2.fromOffset(520, 306)
+SET.page.Size = UDim2.fromOffset(520, 386)
 SET.page.BackgroundTransparency = 1
 SET.page.Visible = false
 SET.page.Parent = main
 
-makeLabel(SET.page, "SettingTitle", "CÀI ĐẶT", UDim2.fromOffset(12, 12), UDim2.fromOffset(496, 24), 15)
+makeLabel(SET.page, "SettingTitle", "CÀI ĐẶT",
+    UDim2.fromOffset(12, 10), UDim2.fromOffset(496, 22), 15)
 
-SET.windowKeyBtn = makeButton(SET.page, "WindowKeyBind", "",
-    UDim2.fromOffset(12, 42), UDim2.fromOffset(496, 34), COLOR_MINUS, 13)
-
-SET.themeBtn = makeButton(SET.page, "ThemeButton", "ĐỔI THEME: MẶC ĐỊNH",
-    UDim2.fromOffset(12, 86), UDim2.fromOffset(496, 34), COLOR_NOCLIP_OFF, 13)
+SET.configNameBox = Instance.new("TextBox")
+SET.configNameBox.Name = "ConfigName"
+SET.configNameBox.Position = UDim2.fromOffset(12, 36)
+SET.configNameBox.Size = UDim2.fromOffset(330, 34)
+SET.configNameBox.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+SET.configNameBox.BorderSizePixel = 0
+SET.configNameBox.Font = Enum.Font.Gotham
+SET.configNameBox.Text = ""
+SET.configNameBox.PlaceholderText = "Tên cấu hình..."
+SET.configNameBox.ClearTextOnFocus = false
+SET.configNameBox.TextColor3 = Color3.fromRGB(25, 30, 35)
+SET.configNameBox.TextSize = 13
+SET.configNameBox.Parent = SET.page
+makeCorner(SET.configNameBox, UDim.new(0, 7))
 
 SET.saveBtn = makeButton(SET.page, "SaveConfig", "LƯU CẤU HÌNH",
-    UDim2.fromOffset(12, 130), UDim2.fromOffset(496, 34), COLOR_PLUS, 13)
+    UDim2.fromOffset(352, 36), UDim2.fromOffset(156, 34), COLOR_PLUS, 12)
 
-SET.statusLabel = makeLabel(SET.page, "SettingStatus", "Cấu hình đã lưu sẽ tự động tải khi mở script.",
-    UDim2.fromOffset(12, 174), UDim2.fromOffset(496, 50), 11)
+makeLabel(SET.page, "ProfilesLabel", "CẤU HÌNH ĐÃ LƯU — bấm TẢI để áp dụng",
+    UDim2.fromOffset(12, 78), UDim2.fromOffset(496, 18), 10).TextColor3 = COLOR_HINT
+
+SET.profileList = Instance.new("ScrollingFrame")
+SET.profileList.Name = "ProfileList"
+SET.profileList.Position = UDim2.fromOffset(12, 98)
+SET.profileList.Size = UDim2.fromOffset(496, 152)
+SET.profileList.BackgroundColor3 = COLOR_LIST
+SET.profileList.BorderSizePixel = 0
+SET.profileList.CanvasSize = UDim2.new(0, 0, 0, 0)
+SET.profileList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+SET.profileList.ScrollBarThickness = 5
+SET.profileList.Parent = SET.page
+makeCorner(SET.profileList, UDim.new(0, 8))
+
+local profileLayout = Instance.new("UIListLayout")
+profileLayout.SortOrder = Enum.SortOrder.LayoutOrder
+profileLayout.Padding = UDim.new(0, 5)
+profileLayout.Parent = SET.profileList
+
+local profilePadding = Instance.new("UIPadding")
+profilePadding.PaddingTop = UDim.new(0, 6)
+profilePadding.PaddingLeft = UDim.new(0, 6)
+profilePadding.PaddingRight = UDim.new(0, 6)
+profilePadding.PaddingBottom = UDim.new(0, 6)
+profilePadding.Parent = SET.profileList
+
+local profileEmpty = makeLabel(SET.profileList, "Empty",
+    "Chưa có cấu hình nào. Nhập tên rồi bấm LƯU CẤU HÌNH.",
+    UDim2.fromOffset(2, 6), UDim2.new(1, -4, 0, 20), 10)
+profileEmpty.Font = Enum.Font.Gotham
+profileEmpty.TextColor3 = COLOR_HINT
+profileEmpty.TextXAlignment = Enum.TextXAlignment.Center
+
+SET.windowKeyBtn = makeButton(SET.page, "WindowKeyBind", "",
+    UDim2.fromOffset(12, 260), UDim2.fromOffset(496, 32), COLOR_MINUS, 12)
+
+SET.themeBtn = makeButton(SET.page, "ThemeButton", "ĐỔI THEME: MẶC ĐỊNH",
+    UDim2.fromOffset(12, 298), UDim2.fromOffset(496, 30), COLOR_NOCLIP_OFF, 12)
+
+SET.statusLabel = makeLabel(SET.page, "SettingStatus",
+    "Cấu hình tự động tải khi mở script; cấu hình có tên được lưu riêng.",
+    UDim2.fromOffset(12, 336), UDim2.fromOffset(496, 44), 10)
 SET.statusLabel.Font = Enum.Font.Gotham
 SET.statusLabel.TextColor3 = COLOR_HINT
 SET.statusLabel.TextWrapped = true
@@ -2799,23 +3244,179 @@ function SET.refresh()
     hint.Text = "E: lên   Q: xuống   E gần vật: tương tác   " .. SET.windowKey.Name .. ": ẩn/hiện"
 end
 
+do
+    local profilesFile = "VHT_Profiles_" .. tostring(game.PlaceId) .. ".json"
+    local savedProfiles = {}
+
+    local function persistProfiles()
+        if not fileStorageAvailable then
+            SET.setStatus("Executor không hỗ trợ lưu file; cấu hình chỉ giữ trong phiên này.")
+            return false
+        end
+
+        local ok, err = pcall(function()
+            fileWrite(profilesFile, HttpService:JSONEncode(savedProfiles))
+        end)
+        if not ok then
+            SET.setStatus("Không thể ghi file cấu hình: " .. tostring(err))
+            return false
+        end
+        return true
+    end
+
+    local function clearProfileRows()
+        for _, child in ipairs(SET.profileList:GetChildren()) do
+            if child:IsA("Frame") then
+                child:Destroy()
+            end
+        end
+    end
+
+    local function renderProfiles()
+        clearProfileRows()
+
+        local names = {}
+        for name in pairs(savedProfiles) do
+            names[#names + 1] = name
+        end
+
+        table.sort(names, function(a, b)
+            local timeA = tonumber(savedProfiles[a].savedAt) or 0
+            local timeB = tonumber(savedProfiles[b].savedAt) or 0
+            if timeA ~= timeB then
+                return timeA > timeB
+            end
+            return a < b
+        end)
+
+        profileEmpty.Visible = #names == 0
+
+        for index, name in ipairs(names) do
+            local row = Instance.new("Frame")
+            row.Name = "ProfileRow"
+            row.Size = UDim2.new(1, 0, 0, 38)
+            row.BackgroundColor3 = COLOR_ROW
+            row.BorderSizePixel = 0
+            row.LayoutOrder = index
+            row.Parent = SET.profileList
+            makeCorner(row, UDim.new(0, 6))
+
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Name = "Name"
+            nameLabel.Position = UDim2.fromOffset(8, 0)
+            nameLabel.Size = UDim2.new(1, -152, 1, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Font = Enum.Font.Gotham
+            nameLabel.TextSize = 11
+            nameLabel.TextColor3 = COLOR_TEXT
+            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+            nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+            nameLabel.Text = name
+            nameLabel.Parent = row
+
+            local loadBtn = makeButton(row, "Load", "TẢI",
+                UDim2.new(1, -146, 0.5, -12), UDim2.fromOffset(64, 24), COLOR_PLUS, 11)
+            local deleteBtn = makeButton(row, "Delete", "XÓA",
+                UDim2.new(1, -78, 0.5, -12), UDim2.fromOffset(64, 24), COLOR_CLOSE, 11)
+
+            loadBtn.Activated:Connect(function()
+                SET.applyProfile(name)
+            end)
+
+            deleteBtn.Activated:Connect(function()
+                savedProfiles[name] = nil
+                persistProfiles()
+                renderProfiles()
+                SET.setStatus("Đã xóa cấu hình: " .. name)
+            end)
+        end
+    end
+
+    local function loadProfiles()
+        if not fileStorageAvailable then
+            return
+        end
+
+        local ok, data = pcall(function()
+            if type(fileExists) == "function" and not fileExists(profilesFile) then
+                return {}
+            end
+            return HttpService:JSONDecode(fileRead(profilesFile))
+        end)
+
+        if ok and type(data) == "table" then
+            for name, config in pairs(data) do
+                if type(name) == "string" and type(config) == "table" then
+                    savedProfiles[name] = config
+                end
+            end
+        end
+    end
+
+    function SET.applyProfile(name)
+        local config = savedProfiles[name]
+        if not config then
+            SET.setStatus("Không tìm thấy cấu hình: " .. tostring(name))
+            return
+        end
+        SET.applyConfig(config)
+        SET.setStatus("Đã tải cấu hình: " .. name)
+    end
+
+    function SET.saveProfile()
+        local name = SET.configNameBox.Text
+        name = name:gsub("^%s+", ""):gsub("%s+$", "")
+        if name == "" then
+            local index = 1
+            name = "Cấu hình " .. tostring(index)
+            while savedProfiles[name] do
+                index += 1
+                name = "Cấu hình " .. tostring(index)
+            end
+        end
+
+        local config = SET.build()
+        config.savedAt = os.time()
+        savedProfiles[name] = config
+
+        local ok = persistProfiles()
+        if fileStorageAvailable then
+            pcall(function()
+                fileWrite(SET.file, HttpService:JSONEncode(config))
+            end)
+        end
+
+        renderProfiles()
+        SET.configNameBox.Text = ""
+        SET.setStatus(ok and ("Đã lưu cấu hình: " .. name)
+            or ("Đã lưu tạm trong phiên: " .. name))
+    end
+
+    function SET.reloadProfiles()
+        savedProfiles = {}
+        loadProfiles()
+        renderProfiles()
+    end
+
+    SET.reloadProfiles()
+end
 local function showTab(tabName)
     flyPage.Visible = tabName == "FLY"
-    serverPage.Visible = tabName == "SERVER"
-    espPage.Visible = tabName == "ESP"
-    teleportPage.Visible = tabName == "TELEPORT"
     speedPage.Visible = tabName == "SPEED"
-    ZM.page.Visible = tabName == "ZOOM"
+    teleportPage.Visible = tabName == "TELEPORT"
     Aim.Page.Visible = tabName == "AIM"
+    espPage.Visible = tabName == "ESP"
+    ZM.page.Visible = tabName == "VISUAL"
+    serverPage.Visible = tabName == "SERVER"
     SET.page.Visible = tabName == "SETTING"
 
     flyTab.BackgroundColor3 = tabName == "FLY" and COLOR_TAB_ON or COLOR_TAB_OFF
-    serverTab.BackgroundColor3 = tabName == "SERVER" and COLOR_TAB_ON or COLOR_TAB_OFF
-    espTab.BackgroundColor3 = tabName == "ESP" and COLOR_TAB_ON or COLOR_TAB_OFF
-    teleportTab.BackgroundColor3 = tabName == "TELEPORT" and COLOR_TAB_ON or COLOR_TAB_OFF
     speedTab.BackgroundColor3 = tabName == "SPEED" and COLOR_TAB_ON or COLOR_TAB_OFF
-    ZM.tab.BackgroundColor3 = tabName == "ZOOM" and COLOR_TAB_ON or COLOR_TAB_OFF
+    teleportTab.BackgroundColor3 = tabName == "TELEPORT" and COLOR_TAB_ON or COLOR_TAB_OFF
     aimTab.BackgroundColor3 = tabName == "AIM" and COLOR_TAB_ON or COLOR_TAB_OFF
+    espTab.BackgroundColor3 = tabName == "ESP" and COLOR_TAB_ON or COLOR_TAB_OFF
+    ZM.tab.BackgroundColor3 = tabName == "VISUAL" and COLOR_TAB_ON or COLOR_TAB_OFF
+    serverTab.BackgroundColor3 = tabName == "SERVER" and COLOR_TAB_ON or COLOR_TAB_OFF
     SET.tab.BackgroundColor3 = tabName == "SETTING" and COLOR_TAB_ON or COLOR_TAB_OFF
 
     if tabName == "SERVER" and not serverLoaded then
@@ -2829,12 +3430,12 @@ showTab("FLY")
 toggle.Activated:Connect(toggleFlight)
 noclipButton.Activated:Connect(toggleNoclip)
 flyTab.Activated:Connect(function() showTab("FLY") end)
-serverTab.Activated:Connect(function() showTab("SERVER") end)
-espTab.Activated:Connect(function() showTab("ESP") end)
-teleportTab.Activated:Connect(function() showTab("TELEPORT") end)
 speedTab.Activated:Connect(function() showTab("SPEED") end)
-ZM.tab.Activated:Connect(function() showTab("ZOOM") end)
+teleportTab.Activated:Connect(function() showTab("TELEPORT") end)
 aimTab.Activated:Connect(function() showTab("AIM") end)
+espTab.Activated:Connect(function() showTab("ESP") end)
+ZM.tab.Activated:Connect(function() showTab("VISUAL") end)
+serverTab.Activated:Connect(function() showTab("SERVER") end)
 SET.tab.Activated:Connect(function() showTab("SETTING") end)
 refreshBtn.Activated:Connect(loadServers)
 minimizeBtn.Activated:Connect(minimizeWindow)
@@ -2846,8 +3447,15 @@ end)
 sortBtn.Activated:Connect(function()
     sortAscending = not sortAscending
     updateSortButton()
-    if serverLoaded and not serverLoading then
+
+    if not serverLoaded then
+        return
+    end
+
+    if serverLoading then
         refreshServerView()
+    else
+        loadServers()
     end
 end)
 
@@ -2950,6 +3558,7 @@ closeBtn.Activated:Connect(function()
     setNoclip(false)
     ESP.Destroy()
     Aim.destroy()
+    VIS.destroy()
     stopSpeedMode(true)
 
     if windowOpen then
@@ -2995,6 +3604,10 @@ end)
 function SET.build()
     return {
         esp = ESP.Enabled,
+        espSkeleton = ESP.Skeleton,
+        espOcclusion = ESP.OcclusionCheck,
+        fullbright = VIS.Fullbright,
+        noFog = VIS.NoFog,
         noclip = noclip,
         speedMode = speedMode,
         walkSpeed = requestedWalkSpeed,
@@ -3021,28 +3634,8 @@ function SET.build()
     }
 end
 
-function SET.save()
-    if not fileStorageAvailable then
-        SET.setStatus("Executor không hỗ trợ lưu file.")
-        return
-    end
-    local ok, err = pcall(function()
-        fileWrite(SET.file, HttpService:JSONEncode(SET.build()))
-    end)
-    SET.setStatus(ok and "Đã lưu cấu hình." or ("Không thể lưu: " .. tostring(err)))
-end
-
-function SET.load()
-    if not fileStorageAvailable then
-        return
-    end
-    local ok, data = pcall(function()
-        if type(fileExists) == "function" and not fileExists(SET.file) then
-            return nil
-        end
-        return HttpService:JSONDecode(fileRead(SET.file))
-    end)
-    if not ok or type(data) ~= "table" then
+function SET.applyConfig(data)
+    if type(data) ~= "table" then
         return
     end
 
@@ -3060,18 +3653,25 @@ function SET.load()
         requestedWalkSpeed = data.walkSpeed
         walkSpeedBox.Text = tostring(data.walkSpeed)
     end
-    if data.noclip == true then
-        setNoclip(true)
+    if type(data.noclip) == "boolean" then
+        setNoclip(data.noclip)
     end
-    if data.esp == true then
-        setESPEnabled(true)
-        refreshESPButtons()
+    if type(data.esp) == "boolean" then
+        setESPEnabled(data.esp)
     end
+    if type(data.espSkeleton) == "boolean" then
+        ESP.Skeleton = data.espSkeleton
+    end
+    if type(data.espOcclusion) == "boolean" then
+        ESP.OcclusionCheck = data.espOcclusion
+    end
+    refreshESPButtons()
     Aim.applyConfig(data)
+    VIS.applyConfig(data)
 
-    if data.firstPerson == true then
-        ZM.firstPerson = true
-        player.CameraMinZoomDistance = 0.5
+    if type(data.firstPerson) == "boolean" then
+        ZM.firstPerson = data.firstPerson
+        player.CameraMinZoomDistance = ZM.firstPerson and 0.5 or ZM.originalMin
     end
     if type(data.maxZoom) == "number" then
         ZM.customMax = data.maxZoom
@@ -3079,15 +3679,39 @@ function SET.load()
     end
     if data.speedMode == "direct" or data.speedMode == "loop" then
         local mode = data.speedMode
-        task.spawn(function()
-            if not player.Character then
-                player.CharacterAdded:Wait()
-            end
-            local hum = player.Character and player.Character:WaitForChild("Humanoid", 10)
-            if hum then
-                setSpeedMode(mode)
-            end
-        end)
+        if speedMode ~= mode then
+            task.spawn(function()
+                if not player.Character then
+                    player.CharacterAdded:Wait()
+                end
+                local hum = player.Character and player.Character:WaitForChild("Humanoid", 10)
+                if hum then
+                    setSpeedMode(mode)
+                end
+            end)
+        end
+    else
+        stopSpeedMode(true)
+    end
+
+    SET.refresh()
+    ZM.refresh()
+end
+
+function SET.load()
+    if not fileStorageAvailable then
+        return
+    end
+
+    local ok, data = pcall(function()
+        if type(fileExists) == "function" and not fileExists(SET.file) then
+            return nil
+        end
+        return HttpService:JSONDecode(fileRead(SET.file))
+    end)
+
+    if ok and type(data) == "table" then
+        SET.applyConfig(data)
     end
 end
 
@@ -3101,7 +3725,7 @@ SET.themeBtn.Activated:Connect(function()
     SET.setStatus("Chưa có theme nào. Theme sẽ được thêm sau.")
 end)
 
-SET.saveBtn.Activated:Connect(SET.save)
+SET.saveBtn.Activated:Connect(SET.saveProfile)
 
 SET.load()
 SET.refresh()
